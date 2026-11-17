@@ -1,0 +1,123 @@
+@model BushiBan.Web.Features.Administration.AuditLogController.AuditPageModel
+@{
+    ViewData["Title"] = "Audit log";
+    var f = Model.Filter;
+    var colspan = Model.AllBranches ? 6 : 5;
+    string Humanize(string s) => EnumHelpers.Humanize(s);
+}
+@section Head { <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" /> }
+<p class="text-body-secondary">Every change anyone makes is recorded here: who, when, and what each field changed from and to. Click a row to see the details.
+    @if (!Model.AllBranches) { <text>You're seeing changes in your current branch.</text> }</p>
+<div class="card">
+    <div class="card-header bg-transparent">
+        <form method="get" class="row g-2 align-items-end" data-autosubmit>
+            <div class="col-6 col-md-3 col-xl-2">
+                <label class="form-label small mb-1" for="entity">Record type</label>
+                <select class="form-select" id="entity" name="Entity" data-search>
+                    <option value="">All types</option>
+                    @foreach (var n in Model.EntityNames) { <option value="@n" selected="@(n == f.Entity)">@BushiBan.Web.Features.Administration.AuditLogController.FriendlyEntity(n)</option> }
+                </select>
+            </div>
+            <div class="col-6 col-md-2 col-xl-1">
+                <label class="form-label small mb-1" for="entityId">Record #</label>
+                <input class="form-control" id="entityId" name="EntityId" value="@f.EntityId" />
+            </div>
+            <div class="col-6 col-md-3 col-xl-2">
+                <label class="form-label small mb-1" for="user">Changed by</label>
+                <input class="form-control" id="user" name="User" value="@f.User" placeholder="Email" />
+            </div>
+            <div class="col-6 col-md-2 col-xl-1">
+                <label class="form-label small mb-1" for="action">Action</label>
+                <select class="form-select" id="action" name="Action">
+                    <option value="">All</option>
+                    @foreach (var a in new[] { "Created", "Updated", "Deleted" }) { <option value="@a" selected="@(a == f.Action)">@a</option> }
+                </select>
+            </div>
+            <div class="col-6 col-md-2 col-xl-2">
+                <label class="form-label small mb-1" for="from">From</label>
+                <input class="form-control" type="date" id="from" name="From" value="@f.From?.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-6 col-md-2 col-xl-2">
+                <label class="form-label small mb-1" for="to">To</label>
+                <input class="form-control" type="date" id="to" name="To" value="@f.To?.ToString("yyyy-MM-dd")" />
+            </div>
+            @if (Model.AllBranches)
+            {
+                <div class="col-6 col-md-3 col-xl-2">
+                    <label class="form-label small mb-1" for="branch">Branch</label>
+                    <select class="form-select" id="branch" name="BranchId">
+                        <option value="">All branches</option>
+                        @foreach (var b in Model.Branches) { <option value="@b.Id" selected="@(b.Id == f.BranchId)">@b.Name</option> }
+                    </select>
+                </div>
+            }
+            <div class="col-auto">
+                <button class="btn btn-outline-secondary" title="Apply filters"><i class="bi bi-funnel"></i></button>
+                @if (f.Any) { <a class="btn btn-link" asp-action="Index">Clear</a> }
+            </div>
+        </form>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr>
+                <th>When</th><th>Who</th><th>Action</th><th>Record</th>
+                @if (Model.AllBranches) { <th>Branch</th> }
+                <th>Fields</th>
+            </tr></thead>
+            <tbody>
+            @if (Model.Paged.Items.Count == 0) { <tr><td colspan="@colspan" class="empty">No changes found.</td></tr> }
+            @foreach (var r in Model.Paged.Items)
+            {
+                var a = r.Log;
+                var rowId = "audit" + a.Id;
+                var badge = a.Action switch { "Created" => "text-bg-success", "Deleted" => "text-bg-danger", _ => "text-bg-primary" };
+                <tr class="audit-row" data-bs-toggle="collapse" data-bs-target="#@rowId" aria-expanded="false" role="button">
+                    <td class="text-nowrap small">@Format.DateTime(Model.Clock.ToLocal(a.At))</td>
+                    <td class="small">@(a.UserName ?? "system")</td>
+                    <td><span class="badge @badge">@a.Action</span></td>
+                    <td>
+                        @BushiBan.Web.Features.Administration.AuditLogController.FriendlyEntity(a.EntityName) <span class="text-body-secondary">#@a.EntityId</span>
+                        <a class="small ms-1" asp-action="Index" asp-route-entity="@a.EntityName" asp-route-entityId="@a.EntityId" title="History of this record" onclick="event.stopPropagation()"><i class="bi bi-clock-history"></i></a>
+                    </td>
+                    @if (Model.AllBranches) { <td class="small">@(r.BranchName ?? "—")</td> }
+                    <td class="small text-body-secondary">
+                        @(r.Changes.Count == 0 ? "—" : string.Join(", ", r.Changes.Take(4).Select(c => Humanize(c.Field))) + (r.Changes.Count > 4 ? $" +{r.Changes.Count - 4} more" : ""))
+                    </td>
+                </tr>
+                <tr class="collapse audit-detail" id="@rowId">
+                    <td colspan="@colspan">
+                        @if (r.Changes.Count == 0)
+                        {
+                            <span class="change-empty">No field details were recorded.</span>
+                        }
+                        else
+                        {
+                            <table class="table table-sm change-table">
+                                <thead><tr><th style="width: 22%">Field</th>@if (a.Action == "Created") { <th>Value</th> } else { <th style="width: 39%">Before</th><th>After</th> }</tr></thead>
+                                <tbody>
+                                @foreach (var c in r.Changes)
+                                {
+                                    <tr>
+                                        <td class="fw-medium">@Humanize(c.Field)</td>
+                                        @if (c.IsCreate)
+                                        {
+                                            <td colspan="@(a.Action == "Created" ? 1 : 2)">@if (c.New is null) { <span class="change-empty">empty</span> } else { <span>@c.New</span> }</td>
+                                        }
+                                        else
+                                        {
+                                            <td>@if (c.Old is null) { <span class="change-empty">empty</span> } else { <span class="change-old">@c.Old</span> }</td>
+                                            <td>@if (c.New is null) { <span class="change-empty">empty</span> } else { <span class="change-new">@c.New</span> }</td>
+                                        }
+                                    </tr>
+                                }
+                                </tbody>
+                            </table>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+<partial name="_Pager" model="(Model.Paged.Page, Model.Paged.Pages, Model.Paged.Total)" />

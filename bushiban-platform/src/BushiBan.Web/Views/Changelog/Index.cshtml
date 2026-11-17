@@ -1,0 +1,45 @@
+@model List<BushiBan.Web.Domain.SystemTables.ChangelogEntry>
+@using BushiBan.Web.Features.Administration
+@{
+    ViewData["Title"] = "What's new";
+    var canManage = ViewData["CanManage"] is true;
+}
+@section Head { <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" /> }
+@section Actions {
+    @if (canManage) { <a class="btn btn-primary" asp-action="Create"><i class="bi bi-plus-lg me-1"></i>Add release notes</a> }
+}
+@if (Model.Count == 0)
+{
+    <div class="card"><div class="card-body text-center text-body-secondary py-5">No release notes yet.</div></div>
+}
+<div class="d-flex flex-column gap-3" style="max-width: 860px">
+    @foreach (var e in Model)
+    {
+        <article class="card release">
+            <div class="card-body">
+                <div class="d-flex flex-wrap align-items-start gap-2 mb-2">
+                    <div class="me-auto">
+                        <h2 class="h5 mb-1">@e.Title</h2>
+                        <div class="small text-body-secondary"><span class="badge text-bg-dark release-version me-2">v@(e.Version)</span>@Format.Date(e.ReleasedOn)</div>
+                    </div>
+                    @if (canManage)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" asp-action="Edit" asp-route-id="@e.Id" title="Edit"><i class="bi bi-pencil"></i></a>
+                        <partial name="_DeleteButton" model='("Changelog", e.Id, "release " + e.Version)' />
+                    }
+                </div>
+                @foreach (var block in ChangelogController.Blocks(e.Body))
+                {
+                    if (block.IsList)
+                    {
+                        <ul>@foreach (var line in block.Lines) { <li>@line</li> }</ul>
+                    }
+                    else
+                    {
+                        <p class="mb-2">@string.Join(" ", block.Lines)</p>
+                    }
+                }
+            </div>
+        </article>
+    }
+</div>

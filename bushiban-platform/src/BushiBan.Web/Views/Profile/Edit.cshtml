@@ -1,0 +1,30 @@
+@model BushiBan.Web.Features.Administration.ProfileController.EditInput
+@{
+    ViewData["Title"] = "Edit my details";
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("My profile", Url.Action("Index")), ("Edit", null) };
+    string? Err(string key) => ViewContext.ViewData.ModelState.TryGetValue(key, out var e) && e.Errors.Count > 0 ? e.Errors[0].ErrorMessage : null;
+}
+<form method="post" class="card form-card" style="max-width: 620px" novalidate>
+    <div class="card-body">
+        <div class="mb-3">
+            <label class="form-label" for="DisplayName">Name</label>
+            <input class="form-control @(Err("DisplayName") is null ? "" : "is-invalid")" id="DisplayName" name="DisplayName" value="@Model.DisplayName" maxlength="120" />
+            <div class="invalid-feedback">@Err("DisplayName")</div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="Email">Email (used to sign in)</label>
+            <input class="form-control @(Err("Email") is null ? "" : "is-invalid")" id="Email" name="Email" type="email" value="@Model.Email" maxlength="150" data-original="@Model.Email" />
+            <div class="invalid-feedback">@Err("Email")</div>
+        </div>
+        <div class="mb-1" id="passwordBox">
+            <label class="form-label" for="CurrentPassword">Current password</label>
+            <input class="form-control @(Err("CurrentPassword") is null ? "" : "is-invalid")" id="CurrentPassword" name="CurrentPassword" type="password" autocomplete="current-password" />
+            <div class="invalid-feedback">@Err("CurrentPassword")</div>
+            <div class="form-text">Only needed if you change your email.</div>
+        </div>
+    </div>
+    <div class="card-footer bg-transparent d-flex gap-2">
+        <button class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Save</button>
+        <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+    </div>
+</form>

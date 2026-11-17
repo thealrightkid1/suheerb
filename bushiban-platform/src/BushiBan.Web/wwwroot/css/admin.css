@@ -1,0 +1,35 @@
+/* Users, permissions, branches, audit log, changelog, profile. */
+
+/* Permissions */
+.perm-total { font-weight: 600; white-space: nowrap; }
+.perm-admin { border-color: #1f2937; }
+.perm-group .card-header { position: sticky; top: var(--topbar-h); background: var(--bs-body-bg) !important; z-index: 1; border-radius: .75rem .75rem 0 0; }
+.perm-group.is-empty .card-header .form-check-label { color: var(--bs-secondary-color); }
+.perm-item { padding: .4rem 0 .4rem 1.75rem; border-bottom: 1px solid var(--card-border); }
+.perm-item:last-child { border-bottom: 0; }
+.perm-item .form-check-input { margin-left: -1.75rem; }
+.perm-item .form-check-input:disabled ~ .form-check-label { opacity: .7; }
+.perm-savebar { position: sticky; bottom: 0; margin: 1rem -.25rem 0; padding: .75rem 1rem; background: var(--bs-body-bg); border: 1px solid var(--card-border); border-radius: .75rem; box-shadow: 0 -4px 12px #0000000d; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; z-index: 2; }
+
+/* Audit log */
+.audit-row { cursor: pointer; }
+.audit-detail > td { background: var(--bs-tertiary-bg); }
+.change-table { font-size: .85rem; margin: 0; }
+.change-table td, .change-table th { padding: .3rem .6rem !important; background: transparent !important; }
+.change-old { color: #b91c1c; text-decoration: line-through; text-decoration-color: #b91c1c80; word-break: break-word; }
+.change-new { color: #15803d; word-break: break-word; }
+[data-bs-theme=dark] .change-old { color: #fca5a5; }
+[data-bs-theme=dark] .change-new { color: #86efac; }
+.change-empty { color: var(--bs-secondary-color); font-style: italic; }
+
+/* Changelog */
+.release { position: relative; }
+.release-version { font-family: var(--bs-font-monospace); font-size: .8rem; }
+.release ul { margin-bottom: .5rem; padding-left: 1.2rem; }
+.release li { margin-bottom: .2rem; }
+
+/* Profile */
+.profile-avatar { width: 64px; height: 64px; border-radius: 50%; background: var(--bb-red); color: #fff; display: grid; place-items: center; font-size: 1.6rem; font-weight: 700; flex: none; }
+.perm-chips { display: flex; flex-wrap: wrap; gap: .35rem; }
+.perm-chips .badge { font-weight: 500; }
+.perm-group .form-check-input:indeterminate, .perm-group .form-check-input:checked { background-color: var(--bb-red); border-color: var(--bb-red); }

@@ -1,0 +1,68 @@
+@model List<BushiBan.Web.Features.Administration.BranchesController.BranchRow>
+@using BushiBan.Web.Features.Administration
+@{
+    ViewData["Title"] = "Branches";
+    var canManage = ViewData["CanManage"] is true;
+    var q = ViewData["q"] as string;
+    var status = ViewData["status"] as string;
+}
+@section Actions {
+    @if (canManage) { <a class="btn btn-primary" asp-action="Create"><i class="bi bi-plus-lg me-1"></i>Add branch</a> }
+}
+<div class="card">
+    <div class="card-header bg-transparent">
+        <form method="get" class="row g-2" data-autosubmit>
+            <div class="col-sm-6 col-lg-4">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input class="form-control" name="q" value="@q" placeholder="Search name, code or city…" />
+                </div>
+            </div>
+            <div class="col-sm-4 col-lg-2">
+                <select class="form-select" name="status" aria-label="Status">
+                    <option value="">Active and inactive</option>
+                    <option value="active" selected="@(status == "active")">Active</option>
+                    <option value="inactive" selected="@(status == "inactive")">Inactive</option>
+                </select>
+            </div>
+            @if (!string.IsNullOrEmpty(q) || !string.IsNullOrEmpty(status)) { <div class="col-auto"><a class="btn btn-link" asp-action="Index">Clear</a></div> }
+        </form>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr>
+                <th>Branch</th><th>Code</th><th>City</th><th>Time zone</th><th>Phone</th><th class="text-end">Students</th><th>Status</th>
+                @if (canManage) { <th class="text-end">Actions</th> }
+            </tr></thead>
+            <tbody>
+            @if (Model.Count == 0) { <tr><td colspan="8" class="empty">No branches found.</td></tr> }
+            @foreach (var b in Model)
+            {
+                var tz = BranchesController.TimeZones.FirstOrDefault(t => t.Id == b.TimeZone).Label ?? b.TimeZone;
+                <tr class="@(b.IsActive ? "" : "text-body-secondary")">
+                    <td>@if (canManage) { <a asp-action="Edit" asp-route-id="@b.Id" class="fw-medium">@b.Name</a> } else { <span class="fw-medium">@b.Name</span> }</td>
+                    <td><code>@b.Code</code></td>
+                    <td>@(b.City is null ? "—" : $"{b.City}, {b.State} {b.Zip}".Trim())</td>
+                    <td class="small">@tz</td>
+                    <td class="text-nowrap">@b.Phone</td>
+                    <td class="text-end">@b.Students.ToString("N0")</td>
+                    <td>@if (b.IsActive) { <span class="badge text-bg-success">Active</span> } else { <span class="badge text-bg-secondary">Inactive</span> }</td>
+                    @if (canManage)
+                    {
+                        <td class="text-end text-nowrap">
+                            <a class="btn btn-sm btn-outline-secondary" asp-action="Edit" asp-route-id="@b.Id" title="Edit"><i class="bi bi-pencil"></i></a>
+                            <form method="post" asp-action="SetActive" asp-route-id="@b.Id" class="d-inline"
+                                  data-confirm="@(b.IsActive ? $"Deactivate {b.Name}? Staff won't be able to switch to it; its records are kept." : $"Make {b.Name} active again?")">
+                                <input type="hidden" name="active" value="@(!b.IsActive ? "true" : "false")" />
+                                <button class="btn btn-sm btn-outline-secondary" title="@(b.IsActive ? "Deactivate" : "Activate")"><i class="bi bi-@(b.IsActive ? "pause-circle" : "play-circle")"></i></button>
+                            </form>
+                            @if (b.Students == 0) { <partial name="_DeleteButton" model='("Branches", b.Id, b.Name)' /> }
+                        </td>
+                    }
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+<p class="small text-body-secondary mt-2">A new branch starts with the standard ranks, belt sizes, fees, programs, chart of accounts, kiosk forms and message templates. Branches with students can't be deleted, only deactivated.</p>

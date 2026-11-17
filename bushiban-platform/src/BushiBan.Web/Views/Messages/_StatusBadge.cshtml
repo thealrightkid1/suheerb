@@ -1,0 +1,11 @@
+@model MessageStatus
+@{
+    var (css, icon) = Model switch
+    {
+        MessageStatus.Sent => ("text-bg-success", "check2"),
+        MessageStatus.Failed => ("text-bg-danger", "x-circle"),
+        MessageStatus.NotConfigured => ("text-bg-warning", "plug"),
+        _ => ("text-bg-secondary", "hourglass"),
+    };
+}
+<span class="badge @css msg-status"><i class="bi bi-@icon me-1"></i>@Model.DisplayName()</span>
