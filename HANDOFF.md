@@ -1,8 +1,67 @@
 # Handoff: Bushi Ban work (cloud session, 17 Nov 2026)
 
-Everything from the cloud session is on the branch `ccr-8ea92446-zlpuye` of `thealrightkid1/suheerb`. `main` (the personal website) was never touched, and no pull request was opened.
+Everything from the cloud session is on the branch `ccr-8ea92446-zlpuye` of `thealrightkid1/suheerb`. No pull request was opened.
+
+**`main` has one addition:** the `bushiban-website/` folder, put there so GitHub Pages could publish a preview. The personal site files on `main` are unchanged.
 
 **Heads-up:** this repository is **public**, so everything on this branch can be seen by anyone. To change that: GitHub → Settings → General → Danger Zone → Change visibility.
+
+## First thing: open the web app (platform) locally
+
+**For the Claude session on the user's computer:** the user's first request is to get the **platform web app** (`bushiban-platform/`) running on their computer and open it in the browser. Do this before anything else.
+
+It runs on **SQLite**, so no database server is needed. A file `bb.db` is created automatically on first start and seeded with all 11 branches and demo data.
+
+**1. Install the .NET 8 SDK** if `dotnet --version` doesn't print `8.x`: https://dotnet.microsoft.com/download/dotnet/8.0. Nothing else is needed: there's no npm and no SQL Server, and the front-end libraries are already in the repo.
+
+**2. Get the branch:**
+
+```
+git clone https://github.com/thealrightkid1/suheerb.git
+cd suheerb
+git checkout ccr-8ea92446-zlpuye
+cd bushiban-platform/src/BushiBan.Web
+```
+
+If the repo is already cloned, run `git fetch` then `git checkout ccr-8ea92446-zlpuye`, and go to the same folder.
+
+**3. Run it.** On Windows (PowerShell):
+
+```powershell
+$env:ASPNETCORE_ENVIRONMENT="Development"
+$env:Database__Provider="Sqlite"
+$env:ConnectionStrings__Default="Data Source=bb.db"
+dotnet run --urls http://localhost:5080
+```
+
+On macOS or Linux:
+
+```bash
+ASPNETCORE_ENVIRONMENT=Development Database__Provider=Sqlite ConnectionStrings__Default="Data Source=bb.db" dotnet run --urls http://localhost:5080
+```
+
+The first start takes 30 to 60 seconds: it restores packages, builds, creates the database and seeds it. Wait for `Now listening on: http://localhost:5080`.
+
+**4. Open http://localhost:5080 and sign in.** These are demo logins that exist only in the local database:
+
+| Email | Password | Sees |
+| --- | --- | --- |
+| admin@bushiban.local | Admin!2026 | Everything, every branch (switch branches at the top) |
+| manager@bushiban.local | Demo!2026 | Pasadena branch manager |
+| accountant@bushiban.local | Demo!2026 | Billing and accounting |
+| frontdesk@bushiban.local | Demo!2026 | Receptionist |
+| kiosk.attendance@bushiban.local | Demo!2026 | Opens straight into the check-in kiosk (try PIN `1001`) |
+| kiosk.registration@bushiban.local | Demo!2026 | Opens straight into the registration kiosk |
+
+Demo students, leads and attendance exist in the **Pasadena** and **Demo** branches.
+
+**If something goes wrong:**
+- **Port 5080 is busy:** use another port, e.g. `--urls http://localhost:5090`.
+- **Starting over with fresh data:** stop the app, delete `bb.db` (plus `bb.db-shm` and `bb.db-wal` if they exist), and run again.
+- **Running the tests (optional):** from `bushiban-platform` run `dotnet test`. 96 should pass.
+- **Using SQL Server instead:** see `bushiban-platform/docs/DEVELOPER-GUIDE.md`. Production uses SQL Server, and the migration is current.
+
+**The marketing site** needs no setup. Open `bushiban-website/index.html` in a browser, or use the live preview at https://thealrightkid1.github.io/suheerb/bushiban-website/ (served by GitHub Pages from `main`).
 
 ## Where things stand
 
