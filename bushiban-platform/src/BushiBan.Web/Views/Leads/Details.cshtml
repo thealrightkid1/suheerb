@@ -1,0 +1,148 @@
+@model LeadDetailsModel
+@{
+    var l = Model.Lead;
+    ViewData["Title"] = l.FullName;
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Leads", Url.Action("Index")), (l.FullName, null) };
+    var canEdit = User.HasPermission(Permissions.Leads.Edit);
+    var converted = l.ConvertedStudentId is not null;
+    var age = PeopleService.Age(l.DateOfBirth, Model.Today);
+    var socials = new[] {
+        ("facebook", CrmUi.SocialUrl(l.Facebook, "https://facebook.com/")), ("instagram", CrmUi.SocialUrl(l.Instagram, "https://instagram.com/")),
+        ("linkedin", CrmUi.SocialUrl(l.LinkedIn, "https://linkedin.com/in/")), ("pinterest", CrmUi.SocialUrl(l.Pinterest, "https://pinterest.com/")),
+        ("twitter-x", CrmUi.SocialUrl(l.Twitter, "https://x.com/")), ("globe", CrmUi.SocialUrl(l.Website, "")) }.Where(s => s.Item2 is not null).ToList();
+}
+@section Head { <link rel="stylesheet" href="~/css/crm.css" asp-append-version="true" /> }
+@section Actions {
+    @if (User.HasPermission(Permissions.Communications.Send))
+    {
+        <a class="btn btn-outline-secondary" href="/Messages/Compose?leadId=@l.Id"><i class="bi bi-chat-left-text me-1"></i>Send message</a>
+    }
+    @if (canEdit) { <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@l.Id"><i class="bi bi-pencil me-1"></i>Edit</a> }
+    @if (converted)
+    {
+        <a class="btn btn-success" asp-controller="Students" asp-action="Details" asp-route-id="@l.ConvertedStudentId"><i class="bi bi-person-check me-1"></i>Open student</a>
+    }
+    else if (canEdit && User.HasPermission(Permissions.Students.Create))
+    {
+        <a class="btn btn-primary" asp-action="Convert" asp-route-id="@l.Id"><i class="bi bi-person-check me-1"></i>Convert to student</a>
+    }
+    @if (User.HasPermission(Permissions.Leads.Delete)) { <partial name="_DeleteButton" model='("Leads", l.Id, "the lead " + l.FullName)' /> }
+}
+
+@if (converted)
+{
+    <div class="alert alert-success d-flex align-items-center gap-2">
+        <i class="bi bi-person-check-fill fs-5"></i>
+        <div>Enrolled as student <a asp-controller="Students" asp-action="Details" asp-route-id="@l.ConvertedStudentId" class="alert-link">@l.ConvertedStudent?.StudentNo</a>
+            on @Format.Date(l.ConvertedAt).</div>
+    </div>
+}
+
+<div class="row g-3">
+    <div class="col-lg-4">
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                    <div>
+                        <div class="fs-5 fw-semibold">@(string.IsNullOrEmpty(l.Title) ? "" : l.Title + " ")@l.FullName</div>
+                        <div class="text-body-secondary small">
+                            @(age is null ? "Age unknown" : $"{age} years old")@(l.AgeGroup is null ? "" : " · " + l.AgeGroup.Value.DisplayName())@(l.Gender is null ? "" : " · " + l.Gender.Value.DisplayName())
+                        </div>
+                    </div>
+                    @if (!l.IsActive) { <span class="badge text-bg-secondary">Inactive</span> }
+                </div>
+                <span class="badge @CrmUi.PhaseClass(l.ProspectPhase) phase-badge mb-3">@l.ProspectPhase.DisplayName()</span>
+
+                <dl class="profile-list">
+                    @if (l.Phone1 is not null) { <dt>@(l.Phone1Label ?? "Phone")</dt><dd><a href="@CrmUi.TelHref(l.Phone1)">@l.Phone1</a></dd> }
+                    @if (l.Phone2 is not null) { <dt>@(l.Phone2Label ?? "Phone 2")</dt><dd><a href="@CrmUi.TelHref(l.Phone2)">@l.Phone2</a></dd> }
+                    @if (l.Email1 is not null) { <dt>@(l.Email1Label ?? "Email")</dt><dd><a href="mailto:@l.Email1">@l.Email1</a></dd> }
+                    @if (l.Email2 is not null) { <dt>@(l.Email2Label ?? "Email 2")</dt><dd><a href="mailto:@l.Email2">@l.Email2</a></dd> }
+                    @if (l.Address1 is not null || l.City is not null)
+                    {
+                        <dt>Address</dt>
+                        <dd>@l.Address1 @if (l.Address2 is not null) { <br />@l.Address2 }<br />@l.City?.Name@(l.City?.State is null ? "" : ", " + l.City.State.Name) @l.ZipCode</dd>
+                    }
+                    @if (l.DateOfBirth is not null) { <dt>Date of birth</dt><dd>@Format.Date(l.DateOfBirth)</dd> }
+                    @if (l.FatherName is not null) { <dt>Father / guardian</dt><dd>@l.FatherName</dd> }
+                    @if (l.MotherName is not null) { <dt>Mother</dt><dd>@l.MotherName</dd> }
+                    <dt>Program</dt><dd>@(l.Course?.Name ?? "Not chosen yet")</dd>
+                    @if (l.Rank is not null) { <dt>Rank</dt><dd><span class="belt" style="@CrmUi.BeltStyle(l.Rank.Color)">@l.Rank.Name</span></dd> }
+                    @if (l.BeltSize is not null) { <dt>Belt size</dt><dd>@l.BeltSize.Name</dd> }
+                    <dt>Inquiry</dt><dd>@Format.Date(l.InquiryDate) · @l.Source.DisplayName()</dd>
+                    @if (!converted)
+                    {
+                        <dt>Next follow-up</dt>
+                        <dd class="@(l.NextFollowUpDate < Model.Today ? "text-danger fw-semibold" : "")">@(l.NextFollowUpDate is null ? "Not scheduled" : Format.Date(l.NextFollowUpDate))</dd>
+                    }
+                    @if (Model.AssignedTo is not null) { <dt>Assigned to</dt><dd>@Model.AssignedTo</dd> }
+                    @if (l.MarketingSource is not null) { <dt>Heard about us</dt><dd>@l.MarketingSource@(l.MarketingSourceDetail is null ? "" : " · " + l.MarketingSourceDetail)</dd> }
+                    @if (l.Meeting is not null) { <dt>Meeting</dt><dd>@l.Meeting@(l.MeetingDetail is null ? "" : " · " + l.MeetingDetail)</dd> }
+                </dl>
+                @if (l.MedicalConcerns is not null)
+                {
+                    <div class="alert alert-warning py-2 small mb-2"><i class="bi bi-heart-pulse me-1"></i><strong>Medical:</strong> <span class="pre-line">@l.MedicalConcerns</span></div>
+                }
+                @if (l.AdditionalInformation is not null) { <p class="small pre-line mb-2">@l.AdditionalInformation</p> }
+                @if (socials.Count > 0)
+                {
+                    <div class="d-flex gap-2 fs-5">
+                        @foreach (var (icon, href) in socials) { <a href="@href" target="_blank" rel="noopener noreferrer" title="@icon"><i class="bi bi-@icon"></i></a> }
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (canEdit && !converted && l.ProspectPhase != ProspectPhase.StopFollowingUp)
+        {
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="card-title-sm">Log a follow-up</div>
+                    <form method="post" asp-action="LogFollowUp" asp-route-id="@l.Id" class="row g-2">
+                        <input type="hidden" name="ReturnTo" value="details" />
+                        <div class="col-12">
+                            <select name="Type" class="form-select form-select-sm" aria-label="How you followed up">
+                                <option value="Call">Called</option><option value="SMS">Texted</option><option value="Email">Emailed</option>
+                                <option value="Meeting">Met in person</option>
+                            </select>
+                        </div>
+                        <div class="col-12"><input name="Body" class="form-control form-control-sm" placeholder="What happened?" maxlength="4000" /></div>
+                        <div class="col-7">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">Next</span>
+                                <input type="date" name="NextFollowUpDate" class="form-control" value="@Model.Today.AddDays(3).ToString("yyyy-MM-dd")" min="@Model.Today.ToString("yyyy-MM-dd")" aria-label="Next follow-up date" />
+                            </div>
+                        </div>
+                        <div class="col-5 d-grid"><button class="btn btn-sm btn-primary">Log</button></div>
+                    </form>
+                </div>
+            </div>
+        }
+
+        @if (Model.Submissions.Count > 0)
+        {
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="card-title-sm">Kiosk registrations</div>
+                    <ul class="list-unstyled mb-0 small">
+                        @foreach (var s in Model.Submissions)
+                        {
+                            <li class="mb-1"><a asp-controller="Registrations" asp-action="Details" asp-route-id="@s.Id">@s.Form</a>
+                                <span class="text-body-secondary">· @Format.Date(Model.Timeline.ToLocal(s.SubmittedAt))</span></li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header bg-transparent fw-semibold">Activity</div>
+            <div class="card-body">
+                <partial name="~/Views/Crm/_Timeline.cshtml" model="Model.Timeline" />
+            </div>
+        </div>
+    </div>
+</div>
+@section Scripts { <script src="~/js/crm.js" asp-append-version="true"></script> }

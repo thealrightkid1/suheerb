@@ -1,0 +1,192 @@
+@* Shared lead/student editor for the PersonBase fields.
+   Render twice: ViewData["Part"] = "personal" (Personal details + Contact & address) and "notes" (Notes & source + Social media).
+   Students require more fields than leads, so labels get the "required" marker accordingly. *@
+@model PersonForm
+@{
+    var part = ViewData["Part"] as string ?? "personal";
+    var s = Model.IsStudent;
+    string Label(bool required) => required ? "form-label required" : "form-label";
+    var titles = PersonFormOptions.Titles.ToList();
+    if (!string.IsNullOrEmpty(Model.Title) && !titles.Contains(Model.Title)) titles.Insert(0, Model.Title);
+}
+@if (part == "personal")
+{
+    <h2 class="form-section-title">Personal details</h2>
+    <div class="row g-3">
+        <div class="col-sm-4 col-md-2">
+            <label asp-for="Title" class="form-label required"></label>
+            <select asp-for="Title" class="form-select">
+                <option value="">Select…</option>
+                @foreach (var t in titles) { <option value="@t">@t</option> }
+            </select>
+            <span asp-validation-for="Title"></span>
+        </div>
+        <div class="col-sm-8 col-md-5">
+            <label asp-for="FirstName" class="form-label required"></label>
+            <input asp-for="FirstName" class="form-control" autocomplete="off" />
+            <span asp-validation-for="FirstName"></span>
+        </div>
+        <div class="col-md-5">
+            <label asp-for="LastName" class="form-label required"></label>
+            <input asp-for="LastName" class="form-control" autocomplete="off" />
+            <span asp-validation-for="LastName"></span>
+        </div>
+        <div class="col-sm-6 col-md-4">
+            <label asp-for="DateOfBirth" class="@Label(s)"></label>
+            <input asp-for="DateOfBirth" type="date" asp-format="{0:yyyy-MM-dd}" class="form-control" data-dob />
+            <span asp-validation-for="DateOfBirth"></span>
+            <div class="form-text" data-age-text></div>
+        </div>
+        <div class="col-sm-6 col-md-4">
+            <label asp-for="AgeGroup" class="form-label"></label>
+            <select asp-for="AgeGroup" asp-items="Html.GetEnumSelectList<AgeGroup>()" class="form-select" data-age-group>
+                <option value="">Select…</option>
+            </select>
+            <div class="form-text">Suggested from the date of birth.</div>
+        </div>
+        <div class="col-sm-6 col-md-4">
+            <label asp-for="Gender" class="@Label(s)"></label>
+            <select asp-for="Gender" asp-items="Html.GetEnumSelectList<Gender>()" class="form-select">
+                <option value="">Select…</option>
+            </select>
+            <span asp-validation-for="Gender"></span>
+        </div>
+        <div class="col-md-6">
+            <label asp-for="FatherName" class="form-label" data-guardian-label></label>
+            <input asp-for="FatherName" class="form-control" />
+            <span asp-validation-for="FatherName"></span>
+            @if (s) { <div class="form-text">A parent or guardian name is required for students under 18.</div> }
+        </div>
+        <div class="col-md-6">
+            <label asp-for="MotherName" class="form-label"></label>
+            <input asp-for="MotherName" class="form-control" />
+        </div>
+        <div class="col-sm-6 col-md-4">
+            <label asp-for="BeltSizeId" class="@Label(s)"></label>
+            <select asp-for="BeltSizeId" asp-items="Model.Options.BeltSizes" class="form-select" data-search>
+                <option value="">Select…</option>
+            </select>
+            <span asp-validation-for="BeltSizeId"></span>
+        </div>
+        <div class="col-sm-6 col-md-8 d-flex align-items-end">
+            <div class="form-check form-switch mb-2">
+                <input asp-for="IsActive" class="form-check-input" role="switch" />
+                <label asp-for="IsActive" class="form-check-label"></label>
+            </div>
+        </div>
+    </div>
+
+    <h2 class="form-section-title">Contact &amp; address</h2>
+    <datalist id="phoneLabels">@foreach (var l in PersonFormOptions.PhoneLabels) { <option value="@l"></option> }</datalist>
+    <datalist id="emailLabels">@foreach (var l in PersonFormOptions.EmailLabels) { <option value="@l"></option> }</datalist>
+    <div class="row g-3">
+        <div class="col-4 col-md-2">
+            <label asp-for="Phone1Label" class="form-label">Label</label>
+            <input asp-for="Phone1Label" class="form-control" list="phoneLabels" />
+        </div>
+        <div class="col-8 col-md-4">
+            <label asp-for="Phone1" class="@Label(s)"></label>
+            <input asp-for="Phone1" class="form-control" type="tel" autocomplete="off" data-dup-phone />
+            <span asp-validation-for="Phone1"></span>
+        </div>
+        <div class="col-4 col-md-2">
+            <label asp-for="Phone2Label" class="form-label">Label</label>
+            <input asp-for="Phone2Label" class="form-control" list="phoneLabels" />
+        </div>
+        <div class="col-8 col-md-4">
+            <label asp-for="Phone2" class="form-label"></label>
+            <input asp-for="Phone2" class="form-control" type="tel" autocomplete="off" />
+            <span asp-validation-for="Phone2"></span>
+        </div>
+        <div class="col-4 col-md-2">
+            <label asp-for="Email1Label" class="form-label">Label</label>
+            <input asp-for="Email1Label" class="form-control" list="emailLabels" />
+        </div>
+        <div class="col-8 col-md-4">
+            <label asp-for="Email1" class="form-label"></label>
+            <input asp-for="Email1" class="form-control" autocomplete="off" data-dup-email />
+            <span asp-validation-for="Email1"></span>
+        </div>
+        <div class="col-4 col-md-2">
+            <label asp-for="Email2Label" class="form-label">Label</label>
+            <input asp-for="Email2Label" class="form-control" list="emailLabels" />
+        </div>
+        <div class="col-8 col-md-4">
+            <label asp-for="Email2" class="form-label"></label>
+            <input asp-for="Email2" class="form-control" autocomplete="off" />
+            <span asp-validation-for="Email2"></span>
+        </div>
+        <div class="col-12" data-dup-result hidden></div>
+        <div class="col-md-6">
+            <label asp-for="Address1" class="@Label(s)"></label>
+            <input asp-for="Address1" class="form-control" />
+            <span asp-validation-for="Address1"></span>
+        </div>
+        <div class="col-md-6">
+            <label asp-for="Address2" class="form-label"></label>
+            <input asp-for="Address2" class="form-control" />
+        </div>
+        <div class="col-md-8">
+            <label asp-for="CityId" class="@Label(s)"></label>
+            <select asp-for="CityId" asp-items="Model.Options.Cities" class="form-select" data-search>
+                <option value="">Type to search cities…</option>
+            </select>
+            <span asp-validation-for="CityId"></span>
+        </div>
+        <div class="col-md-4">
+            <label asp-for="ZipCode" class="@Label(s)"></label>
+            <input asp-for="ZipCode" class="form-control" inputmode="numeric" />
+            <span asp-validation-for="ZipCode"></span>
+        </div>
+    </div>
+}
+else
+{
+    <h2 class="form-section-title">Notes &amp; source</h2>
+    <datalist id="marketingSources">@foreach (var m in PersonFormOptions.MarketingSources) { <option value="@m"></option> }</datalist>
+    <div class="row g-3">
+        <div class="col-md-6">
+            <label asp-for="MedicalConcerns" class="form-label"></label>
+            <textarea asp-for="MedicalConcerns" class="form-control" rows="3" placeholder="Allergies, injuries, conditions the instructor should know about"></textarea>
+        </div>
+        <div class="col-md-6">
+            <label asp-for="AdditionalInformation" class="form-label"></label>
+            <textarea asp-for="AdditionalInformation" class="form-control" rows="3"></textarea>
+        </div>
+        <div class="col-md-6">
+            <label asp-for="MarketingSource" class="form-label">How did they hear about us?</label>
+            <input asp-for="MarketingSource" class="form-control" list="marketingSources" />
+        </div>
+        <div class="col-md-6">
+            <label asp-for="MarketingSourceDetail" class="form-label">Source detail</label>
+            <input asp-for="MarketingSourceDetail" class="form-control" placeholder="e.g. referred by, campaign, event name" />
+        </div>
+        <div class="col-md-6">
+            <label asp-for="Meeting" class="form-label"></label>
+            <input asp-for="Meeting" class="form-control" placeholder="e.g. Intro lesson, phone call" />
+        </div>
+        <div class="col-md-6">
+            <label asp-for="MeetingDetail" class="form-label"></label>
+            <input asp-for="MeetingDetail" class="form-control" />
+        </div>
+    </div>
+
+    <h2 class="form-section-title">Social media</h2>
+    <div class="row g-3">
+        @foreach (var (name, icon, placeholder) in new[] {
+            (nameof(PersonForm.Facebook), "facebook", "Profile link or username"), (nameof(PersonForm.Instagram), "instagram", "@username"),
+            (nameof(PersonForm.LinkedIn), "linkedin", "Profile link"), (nameof(PersonForm.Pinterest), "pinterest", "Profile link or username"),
+            (nameof(PersonForm.Twitter), "twitter-x", "@username"), (nameof(PersonForm.Website), "globe", "https://") })
+        {
+            var value = typeof(PersonForm).GetProperty(name)!.GetValue(Model) as string;
+            var label = name switch { "LinkedIn" => "LinkedIn", "Twitter" => "X / Twitter", _ => name };
+            <div class="col-md-6">
+                <label class="form-label" for="@name">@label</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-@icon"></i></span>
+                    <input class="form-control" id="@name" name="@name" value="@value" maxlength="200" placeholder="@placeholder" />
+                </div>
+            </div>
+        }
+    </div>
+}

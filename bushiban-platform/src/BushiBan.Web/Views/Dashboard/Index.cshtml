@@ -1,2 +1,138 @@
-@{ ViewData["Title"] = "Dashboard"; }
-<div class="card"><div class="card-body">Welcome to Bushi Ban.</div></div>
+@model DashboardModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Dashboard";
+    var firstName = (User.FindFirst("display_name")?.Value ?? "").Split(' ')[0];
+}
+@section Head { <link rel="stylesheet" href="~/css/crm.css" asp-append-version="true" /> }
+@section Actions {
+    @if (User.HasPermission(Permissions.Leads.Create)) { <a class="btn btn-outline-secondary" asp-controller="Leads" asp-action="Create"><i class="bi bi-person-plus me-1"></i>Add lead</a> }
+    @if (User.HasPermission(Permissions.Students.Create)) { <a class="btn btn-primary" asp-controller="Students" asp-action="Create"><i class="bi bi-plus-lg me-1"></i>Add student</a> }
+}
+<p class="text-body-secondary">@(string.IsNullOrEmpty(firstName) ? "Welcome back" : $"Welcome back, {firstName}") · @Model.BranchName · @Model.Today.ToString("dddd, MMMM d")</p>
+
+@if (Model.IsEmpty)
+{
+    <div class="card"><div class="card-body">
+        <p class="mb-1">There's nothing on your dashboard yet.</p>
+        <p class="text-body-secondary mb-0">Use the menu on the left to get to the screens you have access to.</p>
+    </div></div>
+}
+
+@if (Model.Tiles.Count > 0)
+{
+    <div class="row g-3 mb-3">
+        @foreach (var t in Model.Tiles)
+        {
+            <div class="col-sm-6 col-xl-3">
+                <a class="card h-100 tile-link" href="@t.Url">
+                    <div class="card-body stat">
+                        <div class="stat-icon @t.Tint"><i class="bi bi-@t.Icon"></i></div>
+                        <div class="min-w-0">
+                            <div class="stat-value">@t.Value</div>
+                            <div class="stat-label">@t.Label</div>
+                            @if (t.Sub is not null) { <div class="stat-sub text-body-secondary">@t.Sub</div> }
+                        </div>
+                    </div>
+                </a>
+            </div>
+        }
+    </div>
+}
+
+@if (Model.CheckInsChart is not null || Model.LeadsChart is not null)
+{
+    <div class="row g-3 mb-3">
+        @if (Model.CheckInsChart is { } c)
+        {
+            <div class="col-xl-7">
+                <div class="card h-100"><div class="card-body">
+                    <div class="card-title-sm">Check-ins per day, last 30 days</div>
+                    <div class="chart-box"><canvas id="checkinsChart" aria-label="Check-ins per day" role="img"></canvas></div>
+                    <script type="application/json" id="checkinsData">@Html.Raw(JsonSerializer.Serialize(new { labels = c.Labels, values = c.Values }))</script>
+                </div></div>
+            </div>
+        }
+        @if (Model.LeadsChart is { } l)
+        {
+            <div class="col-xl-5">
+                <div class="card h-100"><div class="card-body">
+                    <div class="card-title-sm">Open leads by phase</div>
+                    <div class="chart-box"><canvas id="leadsChart" aria-label="Open leads by phase" role="img"></canvas></div>
+                    <script type="application/json" id="leadsData">@Html.Raw(JsonSerializer.Serialize(new { labels = l.Labels, values = l.Values }))</script>
+                </div></div>
+            </div>
+        }
+    </div>
+}
+
+<div class="row g-3">
+    @if (Model.FollowUps is { } followUps)
+    {
+        <div class="col-lg-6 col-xl-4">
+            <div class="card h-100">
+                <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold"><i class="bi bi-telephone-forward me-2"></i>Follow-ups due</span>
+                    <a class="small" asp-controller="Leads" asp-action="FollowUps">@(Model.FollowUpsTotal > followUps.Count ? $"All {Model.FollowUpsTotal}" : "Open list")</a>
+                </div>
+                <ul class="list-group list-group-flush">
+                    @if (followUps.Count == 0) { <li class="list-group-item text-body-secondary">Nobody to call today.</li> }
+                    @foreach (var p in followUps)
+                    {
+                        <li class="list-group-item">
+                            <a asp-controller="Leads" asp-action="Details" asp-route-id="@p.Id" class="fw-medium">@p.Name</a>
+                            <div class="small @(p.Highlight ? "text-danger" : "text-body-secondary")">@p.Detail</div>
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+    }
+    @if (Model.Birthdays is { } birthdays)
+    {
+        <div class="col-lg-6 col-xl-4">
+            <div class="card h-100">
+                <div class="card-header bg-transparent fw-semibold"><i class="bi bi-cake2 me-2"></i>Birthdays in the next @DashboardService.BirthdayDays days</div>
+                <ul class="list-group list-group-flush">
+                    @if (birthdays.Count == 0) { <li class="list-group-item text-body-secondary">No birthdays coming up.</li> }
+                    @foreach (var p in birthdays)
+                    {
+                        <li class="list-group-item d-flex align-items-center gap-2">
+                            @if (p.Highlight) { <i class="bi bi-balloon-heart-fill text-danger"></i> }
+                            <div>
+                                <a asp-controller="Students" asp-action="Details" asp-route-id="@p.Id" class="fw-medium">@p.Name</a>
+                                <div class="small text-body-secondary">@p.Detail</div>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+    }
+    @if (Model.NotSeen is { } notSeen)
+    {
+        <div class="col-lg-6 col-xl-4">
+            <div class="card h-100">
+                <div class="card-header bg-transparent fw-semibold"><i class="bi bi-person-exclamation me-2"></i>Not seen in @DashboardService.NotSeenDays+ days</div>
+                <ul class="list-group list-group-flush">
+                    @if (notSeen.Count == 0) { <li class="list-group-item text-body-secondary">Every active student has trained recently.</li> }
+                    @foreach (var p in notSeen)
+                    {
+                        <li class="list-group-item">
+                            <a asp-controller="Students" asp-action="Details" asp-route-id="@p.Id" class="fw-medium">@p.Name</a>
+                            <div class="small text-body-secondary">@p.Detail</div>
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    @if (Model.CheckInsChart is not null || Model.LeadsChart is not null)
+    {
+        <script src="~/lib/chartjs/chart.umd.js"></script>
+        <script src="~/js/crm.js" asp-append-version="true"></script>
+    }
+}

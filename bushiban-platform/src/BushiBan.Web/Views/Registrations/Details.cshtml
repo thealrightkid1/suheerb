@@ -1,0 +1,195 @@
+@model RegistrationDetailsModel
+@using System.Text.Json
+@using BushiBan.Web.Services.Forms
+@{
+    var sub = Model.Submission;
+    var name = string.IsNullOrWhiteSpace(sub.FullName) ? "Registration" : sub.FullName;
+    ViewData["Title"] = name;
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Registrations", Url.Action("Index")), (name, null) };
+    var canLead = Model.CanManage && User.HasPermission(Permissions.Leads.Create);
+    var canStudent = Model.CanManage && User.HasPermission(Permissions.Students.Create);
+
+    string? Answer(FormField f)
+    {
+        var text = Model.Data.Text(f.Key);
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        switch (f.Type)
+        {
+            case "checkbox":
+                return text.ToLowerInvariant() is "true" or "on" or "yes" or "1" ? "Yes" : "No";
+            case "date":
+                return DateOnly.TryParse(text, System.Globalization.CultureInfo.InvariantCulture, out var d) ? Format.Date(d) : text;
+            case "city":
+                return int.TryParse(text, out var c) && Model.Cities.TryGetValue(c, out var city) ? city : text;
+            default:
+                return text;
+        }
+    }
+    List<string> Many(FormField f) =>
+        Model.Data.TryGetValue(f.Key, out var v) && v.ValueKind == JsonValueKind.Array
+            ? v.EnumerateArray().Select(x => x.ToString()).Where(x => x.Length > 0).ToList()
+            : (Model.Data.Text(f.Key) is { Length: > 0 } t ? new List<string> { t } : new List<string>());
+}
+@section Head { <link rel="stylesheet" href="~/css/crm.css" asp-append-version="true" /> }
+@section Actions {
+    <button type="button" class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print</button>
+    @if (Model.CanManage)
+    {
+        <form method="post" asp-action="Archive" asp-route-id="@sub.Id" class="d-inline">
+            <button class="btn btn-outline-secondary"><i class="bi bi-@(sub.Status == SubmissionStatus.Archived ? "inbox" : "archive") me-1"></i>@(sub.Status == SubmissionStatus.Archived ? "Move back to inbox" : "Archive")</button>
+        </form>
+        <form method="post" asp-action="Delete" asp-route-id="@sub.Id" class="d-inline" data-confirm="Discard this registration? Use this for tests and duplicates. An admin can restore it.">
+            <button class="btn btn-outline-danger" title="Discard"><i class="bi bi-trash"></i></button>
+        </form>
+    }
+}
+
+<div class="row g-3">
+    <div class="col-xl-8 order-2 order-xl-1">
+        <article class="card submission">
+            <div class="card-body">
+                <header class="submission-head">
+                    <img src="~/img/logo.svg" alt="" width="40" height="40" class="print-only" />
+                    <div>
+                        <h2 class="h5 mb-1">@Model.FormName</h2>
+                        <div class="small text-body-secondary">
+                            Submitted @Format.DateTime(Model.SubmittedLocal) · version @Model.VersionNumber
+                            @if (sub.KioskUser is not null) { <span> · kiosk @sub.KioskUser</span> }
+                        </div>
+                    </div>
+                    <span class="badge @CrmUi.StatusClass(sub.Status) ms-auto no-print">@sub.Status.DisplayName()</span>
+                </header>
+
+                <div class="row g-3 answers">
+                @foreach (var f in Model.Fields)
+                {
+                    var col = f.Width == "half" ? "col-md-6" : "col-12";
+                    switch (f.Type)
+                    {
+                        case "heading":
+                            <div class="col-12"><h3 class="form-section-title">@f.Label</h3></div>
+                            break;
+                        case "notice":
+                            @* Agreement wording from our own form builder (sanitised when the form was saved). *@
+                            <div class="col-12 notice-html">@Html.Raw(f.Html)</div>
+                            break;
+                        case "signature":
+                            <div class="@col">
+                                <div class="answer-label">@f.Label</div>
+                                @if (Model.SignatureKeys.Contains(f.Key))
+                                {
+                                    <img class="signature" src="@Url.Action("Signature", new { id = sub.Id, key = f.Key })" alt="@f.Label" />
+                                }
+                                else { <div class="answer-empty">Not signed</div> }
+                            </div>
+                            break;
+                        case "checkboxes":
+                            var items = Many(f);
+                            <div class="@col">
+                                <div class="answer-label">@f.Label</div>
+                                @if (items.Count == 0) { <div class="answer-empty">None selected</div> }
+                                else { <div class="d-flex flex-wrap gap-1">@foreach (var i in items) { <span class="badge text-bg-light border fw-normal">@i</span> }</div> }
+                            </div>
+                            break;
+                        default:
+                            var answer = Answer(f);
+                            <div class="@col">
+                                <div class="answer-label">@f.Label</div>
+                                @if (answer is null) { <div class="answer-empty">—</div> }
+                                else { <div class="answer pre-line">@answer</div> }
+                            </div>
+                            break;
+                    }
+                }
+                </div>
+            </div>
+        </article>
+    </div>
+
+    <div class="col-xl-4 order-1 order-xl-2 no-print">
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="card-title-sm">Linked to</div>
+                @if (Model.Student is { } st)
+                {
+                    <div class="mb-2"><i class="bi bi-person-check text-success me-1"></i>Student <a asp-controller="Students" asp-action="Details" asp-route-id="@st.Id" class="fw-semibold">@st.Name</a> <span class="text-body-secondary small">@st.No</span></div>
+                }
+                @if (Model.Lead is { } ld)
+                {
+                    <div class="mb-2"><i class="bi bi-person-plus me-1"></i>Lead <a asp-controller="Leads" asp-action="Details" asp-route-id="@ld.Id" class="fw-semibold">@ld.Name</a></div>
+                }
+                @if (Model.Student is null && Model.Lead is null) { <p class="text-body-secondary mb-2">Not linked to anyone yet.</p> }
+
+                @if (Model.CanManage && (Model.Student is null || Model.Lead is null))
+                {
+                    <div class="d-grid gap-2 mt-3">
+                        @if (Model.Student is null && canStudent)
+                        {
+                            <form method="post" asp-action="CreateStudent" asp-route-id="@sub.Id" class="d-grid">
+                                <button class="btn btn-primary"><i class="bi bi-person-check me-1"></i>Create student from this form</button>
+                            </form>
+                        }
+                        @if (Model.Lead is null && Model.Student is null && canLead)
+                        {
+                            <form method="post" asp-action="CreateLead" asp-route-id="@sub.Id" class="d-grid">
+                                <button class="btn btn-outline-primary"><i class="bi bi-person-plus me-1"></i>Create lead from this form</button>
+                            </form>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (Model.CanManage && (Model.Student is null || Model.Lead is null))
+        {
+            @if (Model.Matches.Count > 0)
+            {
+                <div class="card mb-3 border-warning">
+                    <div class="card-body">
+                        <div class="card-title-sm">Possible matches</div>
+                        <p class="small text-body-secondary">Same phone number or email as this form.</p>
+                        <ul class="list-unstyled mb-0">
+                            @foreach (var m in Model.Matches)
+                            {
+                                <li class="d-flex align-items-center gap-2 mb-2">
+                                    <div class="flex-grow-1 small">
+                                        <span class="badge @(m.Kind == "Student" ? "text-bg-success" : "text-bg-secondary")">@m.Kind</span>
+                                        <a href="@Url.Action("Details", m.Kind == "Student" ? "Students" : "Leads", new { id = m.Id })">@m.Name</a>
+                                        <div class="text-body-secondary">@m.Detail</div>
+                                    </div>
+                                    <form method="post" asp-action="Link" asp-route-id="@sub.Id">
+                                        <input type="hidden" name="target" value="@m.Kind:@m.Id" />
+                                        <button class="btn btn-sm btn-outline-success">Link</button>
+                                    </form>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+            }
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="card-title-sm">Link to someone else</div>
+                    <form method="post" asp-action="Link" asp-route-id="@sub.Id">
+                        <select name="target" class="form-select mb-2" data-search aria-label="Student or lead" required asp-items="Model.LinkOptions">
+                            <option value="">Search students and leads…</option>
+                        </select>
+                        <button class="btn btn-outline-secondary w-100"><i class="bi bi-link-45deg me-1"></i>Link</button>
+                    </form>
+                </div>
+            </div>
+        }
+
+        <div class="card">
+            <div class="card-body small">
+                <div class="card-title-sm">Submission</div>
+                <dl class="profile-list mb-0">
+                    <dt>Reference</dt><dd>#@sub.Id</dd>
+                    @if (sub.Phone is not null) { <dt>Phone</dt><dd><a href="@CrmUi.TelHref(sub.Phone)">@sub.Phone</a></dd> }
+                    @if (sub.Email is not null) { <dt>Email</dt><dd><a href="mailto:@sub.Email">@sub.Email</a></dd> }
+                    @if (sub.IpAddress is not null) { <dt>Device IP</dt><dd>@sub.IpAddress</dd> }
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,104 @@
+@model StudentForm
+@using System.Text.Json
+@{
+    var isNew = Model.Id == 0;
+    var name = $"{Model.FirstName} {Model.LastName}".Trim();
+    ViewData["Title"] = isNew ? "Add student" : $"Edit {name}";
+    ViewData["Breadcrumbs"] = isNew
+        ? new List<(string, string?)> { ("Students", Url.Action("Index")), ("Add", null) }
+        : new List<(string, string?)> { ("Students", Url.Action("Index")), (name, Url.Action("Details", new { id = Model.Id })), ("Edit", null) };
+    var fees = Model.Options.Fees.ToDictionary(kv => kv.Key.ToString(), kv => new { name = kv.Value.Name, admission = kv.Value.Admission, security = kv.Value.Security, monthly = kv.Value.Monthly });
+}
+@section Head { <link rel="stylesheet" href="~/css/crm.css" asp-append-version="true" /> }
+<form method="post" asp-action="@(isNew ? "Create" : "Edit")" asp-route-id="@(isNew ? null : Model.Id)" class="card form-card person-form" novalidate
+      data-person-form data-kind="student" data-dup-url="@Url.Action("Duplicates", "Search")" data-exclude-student="@(isNew ? null : Model.Id)" data-exclude-lead="@Model.LeadId">
+    <div class="card-body">
+        @if (Model.Options.PrefilledFrom is not null)
+        {
+            <div class="alert alert-info small"><i class="bi bi-magic me-1"></i>Filled in from @Model.Options.PrefilledFrom. Check the program, rank and belt size before saving.</div>
+        }
+        <partial name="~/Views/Crm/_FormAlerts.cshtml" model="Model" />
+        @if (isNew)
+        {
+            <input type="hidden" asp-for="LeadId" />
+            <input type="hidden" asp-for="SubmissionId" />
+        }
+        <div class="d-flex align-items-center gap-2 mb-3 small text-body-secondary">
+            <i class="bi bi-hash"></i>
+            @if (isNew) { <span>The student number and kiosk PIN are assigned automatically when you save.</span> }
+            else { <span>Student number <strong class="text-body font-monospace">@Model.StudentNo</strong></span> }
+        </div>
+
+        <partial name="~/Views/Crm/_PersonFields.cshtml" model="Model" view-data='new ViewDataDictionary(ViewData) { ["Part"] = "personal" }' />
+
+        <h2 class="form-section-title">Program &amp; enrollment</h2>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label asp-for="CourseId" class="form-label required"></label>
+                <select asp-for="CourseId" asp-items="Model.Options.Courses" class="form-select" data-search data-program>
+                    <option value="">Select…</option>
+                </select>
+                <span asp-validation-for="CourseId"></span>
+            </div>
+            <div class="col-md-6">
+                <label asp-for="RankId" class="form-label required"></label>
+                <select asp-for="RankId" asp-items="Model.Options.Ranks" class="form-select" data-search>
+                    <option value="">Select…</option>
+                </select>
+                <span asp-validation-for="RankId"></span>
+                @if (!isNew) { <div class="form-text">Changing the rank here adds an entry to the rank history. Use Belt promotions for tested promotions.</div> }
+            </div>
+            <div class="col-sm-6 col-md-4">
+                <label asp-for="EnrollmentDate" class="form-label required"></label>
+                <input asp-for="EnrollmentDate" type="date" asp-format="{0:yyyy-MM-dd}" class="form-control" />
+                <span asp-validation-for="EnrollmentDate"></span>
+            </div>
+            <div class="col-sm-6 col-md-4">
+                <label asp-for="RankSince" class="form-label"></label>
+                <input asp-for="RankSince" type="date" asp-format="{0:yyyy-MM-dd}" class="form-control" />
+                <div class="form-text">Leave empty to use the enrollment date.</div>
+            </div>
+            <div class="col-sm-6 col-md-4">
+                <label asp-for="Discount" class="form-label required"></label>
+                <div class="input-group">
+                    <span class="input-group-text">$</span>
+                    <input asp-for="Discount" class="form-control" type="number" step="0.01" min="0" data-discount />
+                </div>
+                <span asp-validation-for="Discount"></span>
+            </div>
+        </div>
+        <div class="fee-panel mt-3" data-fee-panel>
+            <div class="small text-body-secondary mb-2"><i class="bi bi-tags me-1"></i>Standard fees for the selected program (<span data-fee="name">no fee structure</span>). The actual price is set on the student's contract.</div>
+            <div class="row g-2 text-center">
+                <div class="col-6 col-md"><div class="fee-box"><div class="fee-label">Admission</div><div class="fee-value" data-fee="admission">–</div></div></div>
+                <div class="col-6 col-md"><div class="fee-box"><div class="fee-label">Security</div><div class="fee-value" data-fee="security">–</div></div></div>
+                <div class="col-6 col-md"><div class="fee-box"><div class="fee-label">Monthly</div><div class="fee-value" data-fee="monthly">–</div></div></div>
+                <div class="col-6 col-md"><div class="fee-box"><div class="fee-label">Discount</div><div class="fee-value" data-fee="discount">–</div></div></div>
+                <div class="col-12 col-md"><div class="fee-box fee-net"><div class="fee-label">Net payable / month</div><div class="fee-value" data-fee="net">–</div></div></div>
+            </div>
+        </div>
+        <script type="application/json" id="programFees">@Html.Raw(JsonSerializer.Serialize(fees))</script>
+
+        <h2 class="form-section-title">Communication</h2>
+        <p class="small text-body-secondary mb-2">Which contacts may receive newsletters and reminders.</p>
+        <div class="d-flex flex-wrap gap-4">
+            @foreach (var p in new[] { nameof(StudentForm.IsEmail1Subscriber), nameof(StudentForm.IsEmail2Subscriber), nameof(StudentForm.IsPhone1Subscriber), nameof(StudentForm.IsPhone2Subscriber), nameof(StudentForm.IsPostCardSubscriber) })
+            {
+                var on = (bool)typeof(StudentForm).GetProperty(p)!.GetValue(Model)!;
+                var label = p.Replace("Is", "").Replace("Subscriber", "").Replace("PostCard", "Postcard").Replace("Email", "Email ").Replace("Phone", "Phone ");
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="@p" name="@p" value="true" @(on ? "checked" : "") />
+                    <input type="hidden" name="@p" value="false" />
+                    <label class="form-check-label" for="@p">@label.Trim()</label>
+                </div>
+            }
+        </div>
+
+        <partial name="~/Views/Crm/_PersonFields.cshtml" model="Model" view-data='new ViewDataDictionary(ViewData) { ["Part"] = "notes" }' />
+    </div>
+    <div class="card-footer bg-transparent d-flex gap-2">
+        <button class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>@(isNew ? "Enroll student" : "Save changes")</button>
+        <a class="btn btn-outline-secondary" href="@(isNew ? Url.Action("Index") : Url.Action("Details", new { id = Model.Id }))">Cancel</a>
+    </div>
+</form>
+@section Scripts { <script src="~/js/crm.js" asp-append-version="true"></script> }

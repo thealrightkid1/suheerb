@@ -1,0 +1,71 @@
+@model LeadForm
+@{
+    var isNew = Model.Id == 0;
+    var name = $"{Model.FirstName} {Model.LastName}".Trim();
+    ViewData["Title"] = isNew ? "Add lead" : $"Edit {name}";
+    ViewData["Breadcrumbs"] = isNew
+        ? new List<(string, string?)> { ("Leads", Url.Action("Index")), ("Add", null) }
+        : new List<(string, string?)> { ("Leads", Url.Action("Index")), (name, Url.Action("Details", new { id = Model.Id })), ("Edit", null) };
+    var phases = EnumHelpers.SelectList<ProspectPhase>(Model.ProspectPhase)
+        .Where(p => Model.ProspectPhase == ProspectPhase.Enrolled || p.Value != ((int)ProspectPhase.Enrolled).ToString()).ToList();
+}
+@section Head { <link rel="stylesheet" href="~/css/crm.css" asp-append-version="true" /> }
+<form method="post" asp-action="@(isNew ? "Create" : "Edit")" asp-route-id="@(isNew ? null : Model.Id)" class="card form-card person-form" novalidate
+      data-person-form data-kind="lead" data-dup-url="@Url.Action("Duplicates", "Search")" data-exclude-lead="@(isNew ? null : Model.Id)">
+    <div class="card-body">
+        <partial name="~/Views/Crm/_FormAlerts.cshtml" model="Model" />
+        <partial name="~/Views/Crm/_PersonFields.cshtml" model="Model" view-data='new ViewDataDictionary(ViewData) { ["Part"] = "personal" }' />
+
+        <h2 class="form-section-title">Program interest</h2>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label asp-for="CourseId" class="form-label">Interested program</label>
+                <select asp-for="CourseId" asp-items="Model.Options.Courses" class="form-select" data-search>
+                    <option value="">Not sure yet</option>
+                </select>
+                <span asp-validation-for="CourseId"></span>
+            </div>
+            <div class="col-md-6">
+                <label asp-for="RankId" class="form-label">Current rank (if any)</label>
+                <select asp-for="RankId" asp-items="Model.Options.Ranks" class="form-select" data-search>
+                    <option value="">None</option>
+                </select>
+                <span asp-validation-for="RankId"></span>
+            </div>
+            <div class="col-sm-6 col-md-4">
+                <label asp-for="InquiryDate" class="form-label required"></label>
+                <input asp-for="InquiryDate" type="date" asp-format="{0:yyyy-MM-dd}" class="form-control" />
+                <span asp-validation-for="InquiryDate"></span>
+            </div>
+            <div class="col-sm-6 col-md-4">
+                <label asp-for="Source" class="form-label"></label>
+                <select asp-for="Source" asp-items="Html.GetEnumSelectList<LeadSource>()" class="form-select"></select>
+            </div>
+            <div class="col-md-4">
+                <label asp-for="ProspectPhase" class="form-label required"></label>
+                <select asp-for="ProspectPhase" asp-items="phases" class="form-select" disabled="@(Model.ProspectPhase == ProspectPhase.Enrolled)"></select>
+                <span asp-validation-for="ProspectPhase"></span>
+            </div>
+            <div class="col-sm-6 col-md-4">
+                <label asp-for="NextFollowUpDate" class="form-label"></label>
+                <input asp-for="NextFollowUpDate" type="date" asp-format="{0:yyyy-MM-dd}" class="form-control" />
+                <span asp-validation-for="NextFollowUpDate"></span>
+                <div class="form-text">The lead shows on the follow-up list from this date.</div>
+            </div>
+            <div class="col-sm-6 col-md-4">
+                <label asp-for="AssignedToUserId" class="form-label"></label>
+                <select asp-for="AssignedToUserId" asp-items="Model.Options.Staff" class="form-select" data-search>
+                    <option value="">Nobody</option>
+                </select>
+                <span asp-validation-for="AssignedToUserId"></span>
+            </div>
+        </div>
+
+        <partial name="~/Views/Crm/_PersonFields.cshtml" model="Model" view-data='new ViewDataDictionary(ViewData) { ["Part"] = "notes" }' />
+    </div>
+    <div class="card-footer bg-transparent d-flex gap-2">
+        <button class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>@(isNew ? "Add lead" : "Save changes")</button>
+        <a class="btn btn-outline-secondary" href="@(isNew ? Url.Action("Index") : Url.Action("Details", new { id = Model.Id }))">Cancel</a>
+    </div>
+</form>
+@section Scripts { <script src="~/js/crm.js" asp-append-version="true"></script> }

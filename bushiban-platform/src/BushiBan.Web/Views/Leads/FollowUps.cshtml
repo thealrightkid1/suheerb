@@ -1,0 +1,101 @@
+@model FollowUpsModel
+@{
+    ViewData["Title"] = "Follow-ups";
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Leads", Url.Action("Index")), ("Follow-ups", null) };
+    var overdue = Model.Due.Count(d => d.NextFollowUpDate < Model.Today);
+    var defaultNext = Model.Today.AddDays(3).ToString("yyyy-MM-dd");
+    var phases = Enum.GetValues<ProspectPhase>().Where(p => p != ProspectPhase.Enrolled);
+}
+@section Head { <link rel="stylesheet" href="~/css/crm.css" asp-append-version="true" /> }
+@section Actions {
+    <a class="btn btn-outline-secondary" asp-action="Index" asp-route-sort="followup"><i class="bi bi-list-ul me-1"></i>All leads by follow-up date</a>
+}
+<p class="text-body-secondary">
+    @if (Model.Due.Count == 0)
+    {
+        <span>Nobody is waiting for a call today.</span>
+    }
+    else
+    {
+        <span><strong>@Model.Due.Count</strong> @(Model.Due.Count == 1 ? "lead is" : "leads are") due for a follow-up@(overdue > 0 ? $", {overdue} overdue" : "").</span>
+    }
+    @if (Model.UpcomingWeek > 0) { <span>@Model.UpcomingWeek more in the next 7 days.</span> }
+    Log the call and pick the next date to move a lead off this list.
+</p>
+
+@if (Model.Due.Count == 0)
+{
+    <div class="card"><div class="card-body text-center py-5">
+        <i class="bi bi-check2-circle display-5 text-success"></i>
+        <p class="mt-2 mb-0">All caught up.</p>
+    </div></div>
+}
+<div class="followups">
+@foreach (var l in Model.Due)
+{
+    var late = Model.Today.DayNumber - l.NextFollowUpDate.DayNumber;
+    <div class="card mb-3 followup @(late > 0 ? "is-overdue" : "")">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-lg-5">
+                    <div class="d-flex justify-content-between gap-2 flex-wrap">
+                        <a asp-action="Details" asp-route-id="@l.Id" class="fw-semibold fs-6">@l.Name</a>
+                        @if (late > 0) { <span class="badge text-bg-danger">@late @(late == 1 ? "day" : "days") overdue</span> }
+                        else { <span class="badge text-bg-warning">Due today</span> }
+                    </div>
+                    <div class="small mt-1">
+                        <span class="badge @CrmUi.PhaseClass(l.Phase) phase-badge">@l.Phase.DisplayName()</span>
+                        @if (l.Program is not null) { <span class="text-body-secondary ms-1">@l.Program</span> }
+                    </div>
+                    <div class="small mt-2 d-flex flex-wrap gap-3">
+                        @if (l.Phone is not null) { <a href="@CrmUi.TelHref(l.Phone)"><i class="bi bi-telephone me-1"></i>@l.Phone</a> }
+                        @if (l.Email is not null) { <a href="mailto:@l.Email"><i class="bi bi-envelope me-1"></i>@l.Email</a> }
+                    </div>
+                    <div class="small text-body-secondary mt-2">
+                        Inquired @Format.Date(l.InquiryDate).
+                        @if (l.LastActivity is not null)
+                        {
+                            <span>Last contact @Format.Date(l.LastActivityAt): <span class="fst-italic">@(l.LastActivity.Length > 140 ? l.LastActivity[..140] + "…" : l.LastActivity)</span></span>
+                        }
+                        else { <span>No contact logged yet.</span> }
+                    </div>
+                </div>
+                <div class="col-lg-7">
+                    @if (Model.CanEdit)
+                    {
+                        <form method="post" asp-action="LogFollowUp" asp-route-id="@l.Id" class="row g-2">
+                            <div class="col-sm-4">
+                                <select name="Type" class="form-select form-select-sm" aria-label="How you followed up">
+                                    <option value="Call">Called</option>
+                                    <option value="SMS">Texted</option>
+                                    <option value="Email">Emailed</option>
+                                    <option value="Meeting">Met in person</option>
+                                    <option value="Note">Note only</option>
+                                </select>
+                            </div>
+                            <div class="col-sm-8">
+                                <input name="Body" class="form-control form-control-sm" maxlength="4000" placeholder="What happened? (e.g. left voicemail, booked trial for Tuesday)" />
+                            </div>
+                            <div class="col-sm-4">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text">Next</span>
+                                    <input type="date" name="NextFollowUpDate" class="form-control" value="@defaultNext" min="@Model.Today.ToString("yyyy-MM-dd")" aria-label="Next follow-up date" />
+                                </div>
+                            </div>
+                            <div class="col-sm-5">
+                                <select name="Phase" class="form-select form-select-sm" aria-label="Phase">
+                                    <option value="">Keep phase</option>
+                                    @foreach (var p in phases.Where(p => p != l.Phase)) { <option value="@p">Move to: @p.DisplayName()</option> }
+                                </select>
+                            </div>
+                            <div class="col-sm-3 d-grid">
+                                <button class="btn btn-sm btn-primary"><i class="bi bi-check-lg me-1"></i>Log</button>
+                            </div>
+                        </form>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+</div>

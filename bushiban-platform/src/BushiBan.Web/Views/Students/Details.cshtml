@@ -1,0 +1,262 @@
+@model StudentDetailsModel
+@{
+    var s = Model.Student;
+    ViewData["Title"] = s.FullName;
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Students", Url.Action("Index")), (s.FullName, null) };
+    var canEdit = User.HasPermission(Permissions.Students.Edit);
+    var age = PeopleService.Age(s.DateOfBirth, Model.Today);
+    var net = Model.Fees is null ? (decimal?)null : Math.Max(0, Model.Fees.Monthly - s.Discount);
+    var socials = new[] {
+        ("facebook", CrmUi.SocialUrl(s.Facebook, "https://facebook.com/")), ("instagram", CrmUi.SocialUrl(s.Instagram, "https://instagram.com/")),
+        ("linkedin", CrmUi.SocialUrl(s.LinkedIn, "https://linkedin.com/in/")), ("pinterest", CrmUi.SocialUrl(s.Pinterest, "https://pinterest.com/")),
+        ("twitter-x", CrmUi.SocialUrl(s.Twitter, "https://x.com/")), ("globe", CrmUi.SocialUrl(s.Website, "")) }.Where(x => x.Item2 is not null).ToList();
+    var openTasks = Model.Timeline.Items.Count(i => i.IsOpenTask);
+}
+@section Head { <link rel="stylesheet" href="~/css/crm.css" asp-append-version="true" /> }
+@section Actions {
+    @if (User.HasPermission(Permissions.Communications.Send))
+    {
+        <a class="btn btn-outline-secondary" href="/Messages/Compose?studentId=@s.Id"><i class="bi bi-chat-left-text me-1"></i>Send message</a>
+    }
+    @if (canEdit) { <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@s.Id"><i class="bi bi-pencil me-1"></i>Edit</a> }
+    @if (User.HasPermission(Permissions.Students.Delete)) { <partial name="_DeleteButton" model='("Students", s.Id, "the student " + s.FullName)' /> }
+}
+
+<div class="card mb-3 student-hero">
+    <div class="card-body d-flex flex-wrap gap-3 align-items-center">
+        <div class="hero-avatar">@(s.FirstName.Length > 0 ? s.FirstName[..1] : "")@(s.LastName.Length > 0 ? s.LastName[..1] : "")</div>
+        <div class="flex-grow-1">
+            <div class="fs-5 fw-semibold">@(string.IsNullOrEmpty(s.Title) ? "" : s.Title + " ")@s.FullName
+                @if (!s.IsActive) { <span class="badge text-bg-secondary align-middle ms-1">Inactive</span> }
+            </div>
+            <div class="text-body-secondary small d-flex flex-wrap gap-3">
+                <span class="font-monospace">@s.StudentNo</span>
+                @if (s.Rank is not null) { <span class="belt" style="@CrmUi.BeltStyle(s.Rank.Color)">@s.Rank.Name</span> }
+                <span>@(s.Course?.Name ?? "No program")</span>
+                <span>@(age is null ? "Age unknown" : $"{age} years old")</span>
+                <span>Enrolled @Format.Date(s.EnrollmentDate)</span>
+            </div>
+        </div>
+        @if (Model.ShowAttendance)
+        {
+            <div class="hero-stat"><div class="stat-value">@Model.CheckInsThisMonth</div><div class="stat-label">classes this month</div></div>
+            <div class="hero-stat"><div class="stat-value">@(Model.LastSeen is null ? "–" : Format.Date(Model.LastSeen))</div><div class="stat-label">last seen</div></div>
+        }
+        @if (Model.ShowBilling)
+        {
+            <div class="hero-stat"><div class="stat-value @(Model.OverdueBalance > 0 ? "text-danger" : "")">@Format.Money(Model.OpenBalance)</div><div class="stat-label">balance due</div></div>
+        }
+    </div>
+</div>
+
+<ul class="nav nav-tabs crm-tabs mb-3" role="tablist">
+    <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-overview" type="button" role="tab">Overview</button></li>
+    @if (Model.ShowAttendance) { <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-attendance" type="button" role="tab">Attendance</button></li> }
+    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-ranks" type="button" role="tab">Rank history</button></li>
+    @if (Model.ShowBilling) { <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-billing" type="button" role="tab">Billing</button></li> }
+    @if (Model.ShowMessages) { <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-messages" type="button" role="tab">Messages</button></li> }
+    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-activity" type="button" role="tab">Activity @if (openTasks > 0) { <span class="badge rounded-pill text-bg-warning">@openTasks</span> }</button></li>
+</ul>
+
+<div class="tab-content">
+    @* ---------- Overview ---------- *@
+    <div class="tab-pane fade show active" id="tab-overview" role="tabpanel">
+        <div class="row g-3">
+            <div class="col-lg-6">
+                <div class="card h-100"><div class="card-body">
+                    <div class="card-title-sm">Contact</div>
+                    <dl class="profile-list">
+                        @if (s.Phone1 is not null) { <dt>@(s.Phone1Label ?? "Phone")</dt><dd><a href="@CrmUi.TelHref(s.Phone1)">@s.Phone1</a> @if (!s.IsPhone1Subscriber) { <span class="badge text-bg-light border">no messages</span> }</dd> }
+                        @if (s.Phone2 is not null) { <dt>@(s.Phone2Label ?? "Phone 2")</dt><dd><a href="@CrmUi.TelHref(s.Phone2)">@s.Phone2</a></dd> }
+                        @if (s.Email1 is not null) { <dt>@(s.Email1Label ?? "Email")</dt><dd><a href="mailto:@s.Email1">@s.Email1</a> @if (!s.IsEmail1Subscriber) { <span class="badge text-bg-light border">no messages</span> }</dd> }
+                        @if (s.Email2 is not null) { <dt>@(s.Email2Label ?? "Email 2")</dt><dd><a href="mailto:@s.Email2">@s.Email2</a></dd> }
+                        <dt>Address</dt>
+                        <dd>
+                            @if (s.Address1 is null && s.City is null) { <span class="text-body-secondary">Not entered</span> }
+                            else
+                            {
+                                <span>@s.Address1</span>@if (s.Address2 is not null) { <br /><span>@s.Address2</span> }<br /><span>@(string.Join(", ", new[] { s.City?.Name, s.City?.State?.Name }.Where(x => x is not null))) @s.ZipCode</span>
+                            }
+                        </dd>
+                        @if (s.FatherName is not null) { <dt>Father / guardian</dt><dd>@s.FatherName</dd> }
+                        @if (s.MotherName is not null) { <dt>Mother</dt><dd>@s.MotherName</dd> }
+                        <dt>Date of birth</dt><dd>@(s.DateOfBirth is null ? "Not entered" : Format.Date(s.DateOfBirth))@(s.AgeGroup is null ? "" : " · " + s.AgeGroup.Value.DisplayName())@(s.Gender is null ? "" : " · " + s.Gender.Value.DisplayName())</dd>
+                        @if (s.MarketingSource is not null) { <dt>Heard about us</dt><dd>@s.MarketingSource@(s.MarketingSourceDetail is null ? "" : " · " + s.MarketingSourceDetail)</dd> }
+                    </dl>
+                    @if (socials.Count > 0)
+                    {
+                        <div class="d-flex gap-2 fs-5">@foreach (var (icon, href) in socials) { <a href="@href" target="_blank" rel="noopener noreferrer"><i class="bi bi-@icon"></i></a> }</div>
+                    }
+                </div></div>
+            </div>
+            <div class="col-lg-6">
+                <div class="card mb-3"><div class="card-body">
+                    <div class="card-title-sm">Program &amp; rank</div>
+                    <dl class="profile-list">
+                        <dt>Program</dt><dd>@(s.Course?.Name ?? "Not set")</dd>
+                        <dt>Rank</dt><dd>@if (s.Rank is not null) { <span class="belt" style="@CrmUi.BeltStyle(s.Rank.Color)">@s.Rank.Name</span> <span class="text-body-secondary small">since @Format.Date(s.RankSince)</span> } else { <span>Not set</span> }</dd>
+                        <dt>Belt size</dt><dd>@(s.BeltSize?.Name ?? "Not set")</dd>
+                        <dt>Enrolled</dt><dd>@Format.Date(s.EnrollmentDate)</dd>
+                        @if (Model.Fees is not null)
+                        {
+                            <dt>Standard fees</dt>
+                            <dd>@Format.Money(Model.Fees.Monthly)/month<span class="text-body-secondary">@(s.Discount > 0 ? $" − {Format.Money(s.Discount)} discount" : "")</span> = <strong>@Format.Money(net)</strong></dd>
+                        }
+                        @if (Model.FromLead is { } lead) { <dt>From lead</dt><dd><a asp-controller="Leads" asp-action="Details" asp-route-id="@lead.Id">@lead.Name</a></dd> }
+                    </dl>
+                </div></div>
+                <div class="card mb-3"><div class="card-body d-flex align-items-center gap-3">
+                    <div class="flex-grow-1">
+                        <div class="card-title-sm mb-1">Kiosk PIN</div>
+                        @if (s.KioskPin is null) { <span class="text-body-secondary">No PIN yet</span> }
+                        else { <span class="pin" data-pin="@s.KioskPin">••••</span> <button type="button" class="btn btn-sm btn-link" data-reveal-pin>Show</button> }
+                        <div class="small text-body-secondary">Used to check in on the attendance kiosk.</div>
+                    </div>
+                    @if (canEdit)
+                    {
+                        <form method="post" asp-action="ResetPin" asp-route-id="@s.Id" data-confirm="Give @s.FullName a new kiosk PIN? The old one stops working.">
+                            <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-repeat me-1"></i>@(s.KioskPin is null ? "Create PIN" : "Reset PIN")</button>
+                        </form>
+                    }
+                </div></div>
+                @if (s.MedicalConcerns is not null)
+                {
+                    <div class="alert alert-warning"><i class="bi bi-heart-pulse me-1"></i><strong>Medical:</strong> <span class="pre-line">@s.MedicalConcerns</span></div>
+                }
+                @if (s.AdditionalInformation is not null)
+                {
+                    <div class="card mb-3"><div class="card-body"><div class="card-title-sm">Notes</div><p class="pre-line mb-0">@s.AdditionalInformation</p></div></div>
+                }
+                @if (Model.Submissions.Count > 0)
+                {
+                    <div class="card"><div class="card-body">
+                        <div class="card-title-sm">Signed forms</div>
+                        <ul class="list-unstyled mb-0 small">
+                            @foreach (var f in Model.Submissions)
+                            {
+                                <li class="mb-1"><a asp-controller="Registrations" asp-action="Details" asp-route-id="@f.Id">@f.Form</a> <span class="text-body-secondary">· @Format.Date(Model.Timeline.ToLocal(f.SubmittedAt))</span></li>
+                            }
+                        </ul>
+                    </div></div>
+                }
+            </div>
+        </div>
+    </div>
+
+    @* ---------- Attendance ---------- *@
+    @if (Model.ShowAttendance)
+    {
+        <div class="tab-pane fade" id="tab-attendance" role="tabpanel">
+            <div class="row g-3 mb-3">
+                <div class="col-sm-4"><div class="card"><div class="card-body stat"><div class="stat-icon tint-purple"><i class="bi bi-calendar-check"></i></div><div><div class="stat-value">@Model.CheckInsThisMonth</div><div class="stat-label">Check-ins this month</div></div></div></div></div>
+                <div class="col-sm-4"><div class="card"><div class="card-body stat"><div class="stat-icon tint-blue"><i class="bi bi-graph-up"></i></div><div><div class="stat-value">@Model.CheckInsLast30</div><div class="stat-label">Last 30 days</div></div></div></div></div>
+                <div class="col-sm-4"><div class="card"><div class="card-body stat"><div class="stat-icon @(Model.LastSeen is null || Model.LastSeen < Model.Today.AddDays(-14) ? "tint-red" : "tint-green")"><i class="bi bi-eye"></i></div><div><div class="stat-value fs-6">@(Model.LastSeen is null ? "Never" : Format.Date(Model.LastSeen))</div><div class="stat-label">Last seen</div></div></div></div></div>
+            </div>
+            <div class="card">
+                <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold">Last 10 check-ins</span>
+                    @if (User.HasPermission(Permissions.Attendance.View)) { <a class="small" href="/Attendance?studentId=@s.Id">All attendance</a> }
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead><tr><th>Date</th><th>Time</th><th>Program</th><th>Method</th><th class="d-none d-sm-table-cell">Marked by</th></tr></thead>
+                        <tbody>
+                        @if (Model.CheckIns.Count == 0) { <tr><td colspan="5" class="empty">No check-ins yet.</td></tr> }
+                        @foreach (var c in Model.CheckIns)
+                        {
+                            <tr><td>@Format.Date(c.Date)</td><td>@Format.Time(c.Time)</td><td>@c.Program</td><td>@c.Method.DisplayName()</td><td class="d-none d-sm-table-cell">@c.MarkedBy</td></tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+
+    @* ---------- Rank history ---------- *@
+    <div class="tab-pane fade" id="tab-ranks" role="tabpanel">
+        <div class="card">
+            <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">Belt promotions</span>
+                @if (User.HasPermission(Permissions.Ranks.Promote)) { <a class="small" href="/Promotions">Record a promotion</a> }
+            </div>
+            <div class="card-body">
+                @if (Model.Promotions.Count == 0) { <p class="text-body-secondary mb-0">No promotions recorded yet.</p> }
+                else
+                {
+                    <ul class="timeline">
+                        @foreach (var p in Model.Promotions)
+                        {
+                            <li>
+                                <div class="d-flex flex-wrap gap-2 align-items-center">
+                                    @if (p.From is not null) { <span class="belt" style="@CrmUi.BeltStyle(p.FromColor)">@p.From</span> <i class="bi bi-arrow-right"></i> }
+                                    <span class="belt fw-semibold" style="@CrmUi.BeltStyle(p.ToColor)">@p.To</span>
+                                    <span class="meta">@Format.Date(p.PromotedOn)</span>
+                                </div>
+                                @if (p.Notes is not null) { <div class="small text-body-secondary">@p.Notes</div> }
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+
+    @* ---------- Billing ---------- *@
+    @if (Model.ShowBilling)
+    {
+        <div class="tab-pane fade" id="tab-billing" role="tabpanel">
+            <div class="row g-3 mb-3">
+                <div class="col-sm-4"><div class="card"><div class="card-body stat"><div class="stat-icon tint-amber"><i class="bi bi-receipt"></i></div><div><div class="stat-value">@Format.Money(Model.OpenBalance)</div><div class="stat-label">Open balance (@Model.OpenInvoices @(Model.OpenInvoices == 1 ? "invoice" : "invoices"))</div></div></div></div></div>
+                <div class="col-sm-4"><div class="card"><div class="card-body stat"><div class="stat-icon @(Model.OverdueBalance > 0 ? "tint-red" : "tint-green")"><i class="bi bi-exclamation-triangle"></i></div><div><div class="stat-value">@Format.Money(Model.OverdueBalance)</div><div class="stat-label">Past due</div></div></div></div></div>
+                @if (Model.Fees is not null)
+                {
+                    <div class="col-sm-4"><div class="card"><div class="card-body stat"><div class="stat-icon tint-blue"><i class="bi bi-tags"></i></div><div><div class="stat-value">@Format.Money(net)</div><div class="stat-label">Standard monthly after discount</div></div></div></div></div>
+                }
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-outline-secondary" href="/Invoices?studentId=@s.Id"><i class="bi bi-receipt me-1"></i>Invoices</a>
+                <a class="btn btn-outline-secondary" href="/Contracts?studentId=@s.Id"><i class="bi bi-file-earmark-check me-1"></i>Contracts</a>
+                @if (User.HasPermission(Permissions.Billing.Manage)) { <a class="btn btn-outline-primary" href="/Contracts/Create?studentId=@s.Id"><i class="bi bi-plus-lg me-1"></i>Set up a contract</a> }
+                @if (User.HasPermission(Permissions.Billing.ReceivePayments)) { <a class="btn btn-primary" href="/Payments/Create?studentId=@s.Id"><i class="bi bi-credit-card me-1"></i>Take a payment</a> }
+            </div>
+        </div>
+    }
+
+    @* ---------- Messages ---------- *@
+    @if (Model.ShowMessages)
+    {
+        <div class="tab-pane fade" id="tab-messages" role="tabpanel">
+            <div class="card">
+                <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold">Recent messages</span>
+                    @if (User.HasPermission(Permissions.Communications.Send)) { <a class="small" href="/Messages/Compose?studentId=@s.Id">Send a message</a> }
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead><tr><th>When</th><th>Type</th><th>To</th><th>Subject</th><th>Status</th></tr></thead>
+                        <tbody>
+                        @if (Model.Messages.Count == 0) { <tr><td colspan="5" class="empty">No messages sent yet.</td></tr> }
+                        @foreach (var m in Model.Messages)
+                        {
+                            <tr>
+                                <td class="text-nowrap">@Format.DateTime(Model.Timeline.ToLocal(m.CreatedAt))</td>
+                                <td>@m.Channel.DisplayName()</td><td>@m.To</td><td>@m.Subject</td>
+                                <td><span class="badge @(m.Status == MessageStatus.Sent ? "text-bg-success" : m.Status == MessageStatus.Failed ? "text-bg-danger" : "text-bg-secondary")">@m.Status.DisplayName()</span></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+
+    @* ---------- Activity ---------- *@
+    <div class="tab-pane fade" id="tab-activity" role="tabpanel">
+        <div class="card"><div class="card-body">
+            <partial name="~/Views/Crm/_Timeline.cshtml" model="Model.Timeline" />
+        </div></div>
+    </div>
+</div>
+@section Scripts { <script src="~/js/crm.js" asp-append-version="true"></script> }

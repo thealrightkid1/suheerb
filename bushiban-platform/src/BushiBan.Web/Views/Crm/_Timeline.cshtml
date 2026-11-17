@@ -1,0 +1,80 @@
+@* Activity timeline with "add note / call / follow-up task" and open tasks. Used on lead and student pages. *@
+@model TimelineModel
+@{
+    var openTasks = Model.Items.Where(i => i.IsOpenTask).OrderBy(i => i.DueAt).ToList();
+    var defaultDue = Model.ToLocal(Model.NowUtc).Date.AddDays(1).AddHours(10).ToString("yyyy-MM-ddTHH:mm");
+}
+@if (Model.CanAdd)
+{
+    <form method="post" asp-controller="@Model.Controller" asp-action="AddActivity" asp-route-id="@Model.OwnerId" class="activity-form mb-4" data-activity-form>
+        <div class="btn-group btn-group-sm flex-wrap mb-2" role="group" aria-label="What happened">
+            @foreach (var t in ActivityInput.Choices)
+            {
+                var id = $"act-{Model.OwnerId}-{(int)t}";
+                <input type="radio" class="btn-check" name="Type" id="@id" value="@t" @(t == ActivityType.Note ? "checked" : "") />
+                <label class="btn btn-outline-secondary" for="@id">@(t == ActivityType.FollowUp ? "Follow-up task" : t.DisplayName())</label>
+            }
+        </div>
+        <textarea name="Body" class="form-control mb-2" rows="2" maxlength="4000" required placeholder="What happened, or what needs doing?"></textarea>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <div class="due-field" data-due-field hidden>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text">Due</span>
+                    <input type="datetime-local" name="DueAt" class="form-control" value="@defaultDue" />
+                </div>
+            </div>
+            <button class="btn btn-sm btn-primary ms-auto"><i class="bi bi-plus-lg me-1"></i>Add to timeline</button>
+        </div>
+    </form>
+}
+
+@if (openTasks.Count > 0)
+{
+    <div class="card-title-sm">Open tasks</div>
+    <ul class="list-group mb-4">
+        @foreach (var t in openTasks)
+        {
+            var overdue = t.DueAt < Model.NowUtc;
+            <li class="list-group-item d-flex gap-2 align-items-start @(overdue ? "list-group-item-danger" : "")">
+                <i class="bi bi-alarm mt-1"></i>
+                <div class="flex-grow-1">
+                    <div class="pre-line">@t.Body</div>
+                    <div class="small @(overdue ? "fw-semibold" : "text-body-secondary")">
+                        @(overdue ? "Overdue: was due" : "Due") @Format.DateTime(Model.ToLocal(t.DueAt!.Value))
+                    </div>
+                </div>
+                @if (Model.CanAdd)
+                {
+                    <form method="post" asp-controller="@Model.Controller" asp-action="CompleteTask" asp-route-id="@Model.OwnerId" asp-route-activityId="@t.Id">
+                        <button class="btn btn-sm btn-outline-success" title="Mark as done"><i class="bi bi-check-lg"></i> Done</button>
+                    </form>
+                }
+            </li>
+        }
+    </ul>
+}
+
+@if (Model.Items.Count == 0)
+{
+    <p class="text-body-secondary mb-0">Nothing here yet. Notes, calls and stage changes will appear here.</p>
+}
+else
+{
+    <ul class="timeline">
+        @foreach (var i in Model.Items)
+        {
+            <li class="tl-@i.Type.ToString().ToLowerInvariant()">
+                <div class="d-flex gap-2 align-items-baseline flex-wrap">
+                    <span class="fw-semibold"><i class="bi bi-@i.Icon me-1"></i>@(i.Type == ActivityType.FollowUp ? "Follow-up task" : i.Type.DisplayName())</span>
+                    <span class="meta">@Format.DateTime(Model.ToLocal(i.CreatedAt))@(i.By is null ? "" : " · " + i.By)</span>
+                    @if (i.Type == ActivityType.FollowUp && i.DueAt is not null)
+                    {
+                        if (i.CompletedAt is not null) { <span class="badge text-bg-success">Done @Format.Date(Model.ToLocal(i.CompletedAt.Value))</span> }
+                        else { <span class="badge text-bg-warning">Due @Format.DateTime(Model.ToLocal(i.DueAt.Value))</span> }
+                    }
+                </div>
+                <div class="pre-line">@i.Body</div>
+            </li>
+        }
+    </ul>
+}

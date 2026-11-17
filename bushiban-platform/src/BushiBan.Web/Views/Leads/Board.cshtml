@@ -1,0 +1,95 @@
+@model BoardModel
+@{
+    ViewData["Title"] = "Pipeline board";
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Leads", Url.Action("Index")), ("Pipeline board", null) };
+    var phases = Model.Columns.Select(c => c.Phase).ToList();
+}
+@section Head { <link rel="stylesheet" href="~/css/crm.css" asp-append-version="true" /> }
+@section Actions {
+    <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-list-ul me-1"></i>List view</a>
+    @if (User.HasPermission(Permissions.Leads.Create))
+    {
+        <a class="btn btn-primary" asp-action="Create"><i class="bi bi-plus-lg me-1"></i>Add lead</a>
+    }
+}
+@Html.AntiForgeryToken()
+<form method="get" class="row g-2 mb-3 align-items-center" data-autosubmit>
+    <div class="col-12 col-sm-6 col-lg-4">
+        <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input class="form-control" name="q" value="@Model.Q" placeholder="Find a lead on the board" />
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-lg-3">
+        <select class="form-select" name="courseId" asp-items="Model.Courses" aria-label="Program">
+            <option value="">All programs</option>
+        </select>
+    </div>
+    @if (Model.CourseId is not null || !string.IsNullOrEmpty(Model.Q)) { <div class="col-auto"><a class="btn btn-link" asp-action="Board">Clear</a></div> }
+    <div class="col-12 col-lg text-lg-end small text-body-secondary">
+        @if (Model.CanEdit) { <span><i class="bi bi-arrows-move me-1"></i>Drag a card to another column to change its phase. Enrolled leads leave the board.</span> }
+    </div>
+</form>
+
+<div class="board" data-board data-move-url="@Url.Action("ChangePhase")" data-can-edit="@(Model.CanEdit ? "true" : "false")">
+    @foreach (var (phase, total, cards) in Model.Columns)
+    {
+        <section class="board-col" data-phase="@((int)phase)" aria-label="@phase.DisplayName()">
+            <div class="board-col-head">
+                <span><span class="phase-dot @CrmUi.PhaseClass(phase)"></span>@phase.DisplayName()</span>
+                <span class="badge rounded-pill text-bg-light border" data-count>@total</span>
+            </div>
+            <div class="board-col-body" data-dropzone>
+                @foreach (var c in cards)
+                {
+                    var overdue = c.NextFollowUpDate < Model.Today;
+                    var dueToday = c.NextFollowUpDate == Model.Today;
+                    <article class="board-card" draggable="@(Model.CanEdit ? "true" : "false")" data-id="@c.Id">
+                        <div class="d-flex justify-content-between gap-2">
+                            <a asp-action="Details" asp-route-id="@c.Id" class="fw-semibold text-body">@c.Name</a>
+                            @if (Model.CanEdit)
+                            {
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-link p-0 text-body-secondary" data-bs-toggle="dropdown" aria-label="Move to another phase"><i class="bi bi-three-dots-vertical"></i></button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li class="dropdown-header">Move to</li>
+                                        @foreach (var p in phases)
+                                        {
+                                            <li hidden="@(p == phase)"><button type="button" class="dropdown-item" data-move-to="@((int)p)">@p.DisplayName()</button></li>
+                                        }
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><a class="dropdown-item" asp-action="Convert" asp-route-id="@c.Id"><i class="bi bi-person-check me-1"></i>Convert to student</a></li>
+                                    </ul>
+                                </div>
+                            }
+                        </div>
+                        @if (c.Program is not null) { <div class="small text-body-secondary">@c.Program</div> }
+                        <div class="small d-flex flex-wrap gap-2 mt-1">
+                            @if (c.Phone is not null) { <a href="@CrmUi.TelHref(c.Phone)" class="text-body-secondary"><i class="bi bi-telephone me-1"></i>@c.Phone</a> }
+                        </div>
+                        <div class="small mt-1 d-flex justify-content-between">
+                            <span class="text-body-secondary" title="Inquiry date"><i class="bi bi-calendar-event me-1"></i>@Format.Date(c.InquiryDate)</span>
+                            @if (c.NextFollowUpDate is not null)
+                            {
+                                <span class="@(overdue ? "text-danger fw-semibold" : dueToday ? "text-warning-emphasis fw-semibold" : "text-body-secondary")" title="Next follow-up">
+                                    <i class="bi bi-alarm me-1"></i>@(dueToday ? "Today" : Format.Date(c.NextFollowUpDate))
+                                </span>
+                            }
+                        </div>
+                    </article>
+                }
+                @if (total > cards.Count)
+                {
+                    <a class="small text-center d-block py-1" asp-action="Index" asp-route-phase="@((int)phase)" asp-route-active="yes">See all @total in the list</a>
+                }
+                <div class="board-empty small text-body-secondary text-center py-3" @(cards.Count > 0 ? "hidden" : "")>No leads here</div>
+            </div>
+        </section>
+    }
+</div>
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div class="toast align-items-center border-0" role="status" aria-live="polite" data-board-toast>
+        <div class="d-flex"><div class="toast-body"></div><button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>
+    </div>
+</div>
+@section Scripts { <script src="~/js/crm.js" asp-append-version="true"></script> }

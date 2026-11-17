@@ -1,0 +1,86 @@
+@model ConvertModel
+@{
+    var l = Model.Lead;
+    ViewData["Title"] = $"Enroll {l.FullName}";
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Leads", Url.Action("Index")), (l.FullName, Url.Action("Details", new { id = l.Id })), ("Convert to student", null) };
+    var f = Model.Form;
+}
+@section Head { <link rel="stylesheet" href="~/css/crm.css" asp-append-version="true" /> }
+<div class="row g-3">
+    <div class="col-lg-7">
+        <form method="post" asp-action="Convert" asp-route-id="@l.Id" class="card form-card" novalidate>
+            <div class="card-body">
+                <p class="text-body-secondary">
+                    This creates a student record with the next student number and a kiosk PIN, copies every detail from the lead,
+                    and marks the lead as <strong>Enrolled</strong>. The lead's notes and calls carry over to the student.
+                </p>
+                @if (Model.ExistingStudents.Count > 0)
+                {
+                    <div class="alert alert-warning small">
+                        <i class="bi bi-people me-1"></i>A student with the same phone or email already exists:
+                        @foreach (var s in Model.ExistingStudents)
+                        {
+                            <a asp-controller="Students" asp-action="Details" asp-route-id="@s.Id" target="_blank" class="alert-link">@s.Name (@s.Detail)</a>
+                        }
+                        . Make sure you aren't enrolling the same person twice.
+                    </div>
+                }
+                <h2 class="form-section-title">Program &amp; rank</h2>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label asp-for="Form.CourseId" class="form-label required"></label>
+                        <select asp-for="Form.CourseId" asp-items="Model.Courses" class="form-select" data-search><option value="">Select…</option></select>
+                        <span asp-validation-for="Form.CourseId"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="Form.RankId" class="form-label required">Starting rank</label>
+                        <select asp-for="Form.RankId" asp-items="Model.Ranks" class="form-select" data-search><option value="">Select…</option></select>
+                        <span asp-validation-for="Form.RankId"></span>
+                    </div>
+                    <div class="col-md-4">
+                        <label asp-for="Form.BeltSizeId" class="form-label required"></label>
+                        <select asp-for="Form.BeltSizeId" asp-items="Model.BeltSizes" class="form-select" data-search><option value="">Select…</option></select>
+                        <span asp-validation-for="Form.BeltSizeId"></span>
+                    </div>
+                    <div class="col-md-4">
+                        <label asp-for="Form.EnrollmentDate" class="form-label required"></label>
+                        <input asp-for="Form.EnrollmentDate" type="date" asp-format="{0:yyyy-MM-dd}" class="form-control" />
+                        <span asp-validation-for="Form.EnrollmentDate"></span>
+                    </div>
+                    <div class="col-md-4">
+                        <label asp-for="Form.Discount" class="form-label"></label>
+                        <div class="input-group"><span class="input-group-text">$</span><input asp-for="Form.Discount" type="number" class="form-control" step="0.01" min="0" /></div>
+                        <span asp-validation-for="Form.Discount"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer bg-transparent d-flex gap-2">
+                <button class="btn btn-primary"><i class="bi bi-person-check me-1"></i>Enroll as student</button>
+                <a class="btn btn-outline-secondary" asp-action="Details" asp-route-id="@l.Id">Cancel</a>
+            </div>
+        </form>
+    </div>
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-body">
+                <div class="card-title-sm">Copied from the lead</div>
+                <dl class="profile-list">
+                    <dt>Name</dt><dd>@(string.IsNullOrEmpty(l.Title) ? "" : l.Title + " ")@l.FullName</dd>
+                    <dt>Date of birth</dt><dd>@(l.DateOfBirth is null ? "—" : Format.Date(l.DateOfBirth))</dd>
+                    <dt>Phone</dt><dd>@(l.Phone1 ?? "—")</dd>
+                    <dt>Email</dt><dd>@(l.Email1 ?? "—")</dd>
+                    <dt>Address</dt><dd>@(l.Address1 ?? "—") @l.City?.Name @l.ZipCode</dd>
+                    <dt>Parent / guardian</dt><dd>@(l.FatherName ?? l.MotherName ?? "—")</dd>
+                    <dt>Medical</dt><dd>@(l.MedicalConcerns ?? "—")</dd>
+                </dl>
+                @if (Model.Missing.Count > 0)
+                {
+                    <div class="alert alert-info small mb-0">
+                        <i class="bi bi-info-circle me-1"></i>Still missing: <strong>@string.Join(", ", Model.Missing)</strong>.
+                        You can enroll now and add these on the student's profile afterwards.
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>

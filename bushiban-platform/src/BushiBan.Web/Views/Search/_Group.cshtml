@@ -1,0 +1,34 @@
+@* One group of search results: (title, icon, controller, hits, total, query). Hidden when the user can't see the group or nothing matched. *@
+@model (string Title, string Icon, string Controller, List<SearchHit>? Hits, int Total, string Q)
+@if (Model.Hits is { Count: > 0 } hits)
+{
+    <div class="card mb-3">
+        <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+            <span class="fw-semibold"><i class="bi bi-@Model.Icon me-2"></i>@Model.Title <span class="badge rounded-pill text-bg-light border">@Model.Total</span></span>
+            @if (Model.Total > hits.Count)
+            {
+                <a class="small" href="@Url.Action("Index", Model.Controller, Model.Controller == "Students" ? (object)new { q = Model.Q, active = "all" } : new { q = Model.Q })">Show all @Model.Total</a>
+            }
+        </div>
+        <ul class="list-group list-group-flush">
+            @foreach (var h in hits)
+            {
+                <li class="list-group-item search-hit @(h.Muted ? "row-muted" : "")">
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                        <a href="@Url.Action("Details", Model.Controller, new { id = h.Id })" class="fw-semibold">@(string.IsNullOrWhiteSpace(h.Name) ? "(no name)" : h.Name)</a>
+                        @if (h.Badge is not null)
+                        {
+                            if (Model.Controller == "Students") { <span class="belt small" style="@CrmUi.BeltStyle(h.BadgeColor)">@h.Badge</span> }
+                            else { <span class="badge text-bg-light border fw-normal">@h.Badge</span> }
+                        }
+                        <span class="small text-body-secondary ms-sm-auto d-flex gap-3 flex-wrap">
+                            @if (h.Phone is not null) { <span><i class="bi bi-telephone me-1"></i>@h.Phone</span> }
+                            @if (h.Email is not null) { <span><i class="bi bi-envelope me-1"></i>@h.Email</span> }
+                        </span>
+                    </div>
+                    @if (h.Sub is not null) { <div class="small text-body-secondary">@h.Sub</div> }
+                </li>
+            }
+        </ul>
+    </div>
+}

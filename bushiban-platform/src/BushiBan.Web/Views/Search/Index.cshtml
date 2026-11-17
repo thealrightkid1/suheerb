@@ -1,0 +1,33 @@
+@model SearchModel
+@{
+    ViewData["Title"] = string.IsNullOrEmpty(Model.Q) ? "Search" : $"Results for \"{Model.Q}\"";
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Search", null) };
+}
+@section Head { <link rel="stylesheet" href="~/css/crm.css" asp-append-version="true" /> }
+<form method="get" class="mb-4" role="search">
+    <div class="input-group input-group-lg search-big">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input class="form-control" name="q" value="@Model.Q" placeholder="Name, student number, phone or email" autofocus />
+        <button class="btn btn-primary">Search</button>
+    </div>
+</form>
+
+@if (Model.Q.Length < 2)
+{
+    <p class="text-body-secondary">Type at least two characters. You can search by name, student number (e.g. PAS-00012), any part of a phone number, or email.</p>
+}
+else if (Model.Total == 0)
+{
+    <div class="card"><div class="card-body text-center py-5">
+        <i class="bi bi-search display-6 text-body-secondary"></i>
+        <p class="mt-2 mb-1">Nothing matches "@Model.Q".</p>
+        <p class="small text-body-secondary mb-0">Check the spelling, or try just the last name or the last four digits of the phone number.</p>
+    </div></div>
+}
+else
+{
+    <p class="text-body-secondary small">@Model.Total @(Model.Total == 1 ? "match" : "matches")</p>
+    @await Html.PartialAsync("_Group", ("Students", "people", "Students", Model.Students, Model.StudentTotal, Model.Q))
+    @await Html.PartialAsync("_Group", ("Leads", "person-plus", "Leads", Model.Leads, Model.LeadTotal, Model.Q))
+    @await Html.PartialAsync("_Group", ("Registrations", "file-earmark-text", "Registrations", Model.Registrations, Model.RegistrationTotal, Model.Q))
+}

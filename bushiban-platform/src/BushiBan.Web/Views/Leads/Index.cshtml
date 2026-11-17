@@ -1,0 +1,120 @@
+@model LeadIndexModel
+@{
+    ViewData["Title"] = "Leads";
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Leads", null) };
+    var f = Model.Filter;
+    var canEdit = User.HasPermission(Permissions.Leads.Edit);
+    var canDelete = User.HasPermission(Permissions.Leads.Delete);
+}
+@section Head { <link rel="stylesheet" href="~/css/crm.css" asp-append-version="true" /> }
+@section Actions {
+    <a class="btn btn-outline-secondary" asp-action="Board"><i class="bi bi-kanban me-1"></i>Pipeline board</a>
+    @if (User.HasPermission(Permissions.Leads.Create))
+    {
+        <a class="btn btn-primary" asp-action="Create"><i class="bi bi-plus-lg me-1"></i>Add lead</a>
+    }
+}
+<div class="card">
+    <div class="card-header bg-transparent">
+        <form method="get" class="row g-2 align-items-end" data-autosubmit>
+            <div class="col-12 col-md-6 col-xl-3">
+                <label class="form-label small mb-1" for="q">Search</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input class="form-control" id="q" name="q" value="@f.Q" placeholder="Name, phone or email" />
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-xl-2">
+                <label class="form-label small mb-1" for="phase">Phase</label>
+                <select class="form-select" id="phase" name="phase" asp-items="EnumHelpers.SelectList(f.Phase)">
+                    <option value="">Any phase</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-3 col-xl-2">
+                <label class="form-label small mb-1" for="courseId">Program</label>
+                <select class="form-select" id="courseId" name="courseId" asp-items="Model.Courses">
+                    <option value="">Any program</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-3 col-xl-2">
+                <label class="form-label small mb-1" for="source">Source</label>
+                <select class="form-select" id="source" name="source" asp-items="EnumHelpers.SelectList(f.Source)">
+                    <option value="">Any source</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-3 col-xl-1">
+                <label class="form-label small mb-1" for="active">Active</label>
+                <select class="form-select" id="active" name="active">
+                    <option value="" selected="@(string.IsNullOrEmpty(f.Active))">All</option>
+                    <option value="yes" selected="@(f.Active == "yes")">Active</option>
+                    <option value="no" selected="@(f.Active == "no")">Inactive</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-3 col-xl-2">
+                <label class="form-label small mb-1" for="sort">Sort by</label>
+                <select class="form-select" id="sort" name="sort">
+                    <option value="" selected="@(string.IsNullOrEmpty(f.Sort))">Newest inquiry</option>
+                    <option value="oldest" selected="@(f.Sort == "oldest")">Oldest inquiry</option>
+                    <option value="name" selected="@(f.Sort == "name")">Last name</option>
+                    <option value="followup" selected="@(f.Sort == "followup")">Next follow-up</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-3 col-xl-2">
+                <label class="form-label small mb-1" for="from">Inquiry from</label>
+                <input class="form-control" type="date" id="from" name="from" value="@f.From?.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-6 col-md-3 col-xl-2">
+                <label class="form-label small mb-1" for="to">Inquiry to</label>
+                <input class="form-control" type="date" id="to" name="to" value="@f.To?.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filter</button>
+                @if (f.IsFiltered || !string.IsNullOrEmpty(f.Sort)) { <a class="btn btn-link" asp-action="Index">Clear</a> }
+            </div>
+        </form>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr>
+                <th>Full name</th><th>Contact</th><th class="d-none d-xxl-table-cell">Email</th><th class="d-none d-xxl-table-cell">City</th>
+                <th>Age</th><th class="d-none d-xl-table-cell">Rank</th><th class="d-none d-md-table-cell">Program</th>
+                <th>Inquiry date</th><th>Prospect phase</th><th>Active</th><th class="text-end">Actions</th>
+            </tr></thead>
+            <tbody>
+            @if (Model.Rows.Items.Count == 0)
+            {
+                <tr><td colspan="11" class="empty">@(f.IsFiltered ? "No leads match these filters." : "No leads yet. Add your first one with \"Add lead\".")</td></tr>
+            }
+            @foreach (var r in Model.Rows.Items)
+            {
+                var followUpDue = r.ConvertedStudentId is null && r.NextFollowUpDate <= Model.Today && r.Phase != ProspectPhase.StopFollowingUp;
+                <tr class="@(r.IsActive ? "" : "row-muted")">
+                    <td>
+                        <a asp-action="Details" asp-route-id="@r.Id" class="fw-medium text-nowrap">@r.Name</a>
+                        @if (followUpDue) { <i class="bi bi-alarm text-danger ms-1" title="Follow-up due @Format.Date(r.NextFollowUpDate)"></i> }
+                        <div class="small text-body-secondary">@r.Source.DisplayName()</div>
+                    </td>
+                    <td><div class="text-nowrap">@if (r.Phone is not null) { <a href="@CrmUi.TelHref(r.Phone)">@r.Phone</a> }</div>@if (r.Email is not null) { <div class="small d-xxl-none text-truncate cell-email"><a href="mailto:@r.Email" class="text-body-secondary">@r.Email</a></div> }</td>
+                    <td class="d-none d-xxl-table-cell">@if (r.Email is not null) { <a href="mailto:@r.Email">@r.Email</a> }</td>
+                    <td class="d-none d-xxl-table-cell">@r.City</td>
+                    <td>@PeopleService.Age(r.DateOfBirth, Model.Today)</td>
+                    <td class="d-none d-xl-table-cell">@if (r.Rank is not null) { <span class="belt" style="@CrmUi.BeltStyle(r.RankColor)">@r.Rank</span> }</td>
+                    <td class="d-none d-md-table-cell small cell-program">@r.Program</td>
+                    <td class="text-nowrap">@Format.Date(r.InquiryDate)</td>
+                    <td><span class="badge @CrmUi.PhaseClass(r.Phase) phase-badge">@r.Phase.DisplayName()</span></td>
+                    <td>@if (r.IsActive) { <span class="badge text-bg-success">Yes</span> } else { <span class="badge text-bg-secondary">No</span> }</td>
+                    <td class="text-end text-nowrap">
+                        @if (r.ConvertedStudentId is int sid)
+                        {
+                            <a class="btn btn-sm btn-outline-success" asp-controller="Students" asp-action="Details" asp-route-id="@sid" title="Open student"><i class="bi bi-person-check"></i></a>
+                        }
+                        @if (canEdit) { <a class="btn btn-sm btn-outline-secondary" asp-action="Edit" asp-route-id="@r.Id" title="Edit"><i class="bi bi-pencil"></i></a> }
+                        @if (canDelete) { <partial name="_DeleteButton" model='("Leads", r.Id, "the lead " + r.Name)' /> }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+<partial name="_Pager" model="(Model.Rows.Page, Model.Rows.Pages, Model.Rows.Total)" />
