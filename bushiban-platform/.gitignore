@@ -1,0 +1,11 @@
+bin/
+obj/
+*.user
+*.db
+*.db-shm
+*.db-wal
+.vs/
+.vscode/
+TestResults/
+appsettings.Local.json
+src/BushiBan.Web/wwwroot/uploads/

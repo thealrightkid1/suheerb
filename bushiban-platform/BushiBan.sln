@@ -1,0 +1,36 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{60AE751E-610B-4D93-8F5D-9845A77B84B6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BushiBan.Web", "src\BushiBan.Web\BushiBan.Web.csproj", "{42CF19B3-9376-4DC4-827D-3CBA5ACEC13A}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{F654863E-C8DF-4DF3-A7B9-896DC1822FE4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BushiBan.Tests", "tests\BushiBan.Tests\BushiBan.Tests.csproj", "{D45263DA-04A2-4D68-B6A2-E1DD935EDA26}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{42CF19B3-9376-4DC4-827D-3CBA5ACEC13A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{42CF19B3-9376-4DC4-827D-3CBA5ACEC13A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{42CF19B3-9376-4DC4-827D-3CBA5ACEC13A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{42CF19B3-9376-4DC4-827D-3CBA5ACEC13A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D45263DA-04A2-4D68-B6A2-E1DD935EDA26}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D45263DA-04A2-4D68-B6A2-E1DD935EDA26}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D45263DA-04A2-4D68-B6A2-E1DD935EDA26}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D45263DA-04A2-4D68-B6A2-E1DD935EDA26}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{42CF19B3-9376-4DC4-827D-3CBA5ACEC13A} = {60AE751E-610B-4D93-8F5D-9845A77B84B6}
+		{D45263DA-04A2-4D68-B6A2-E1DD935EDA26} = {F654863E-C8DF-4DF3-A7B9-896DC1822FE4}
+	EndGlobalSection
+EndGlobal

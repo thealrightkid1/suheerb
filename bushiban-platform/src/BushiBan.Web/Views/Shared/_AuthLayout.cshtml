@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] · Bushi Ban</title>
+    <script>document.documentElement.dataset.bsTheme = localStorage.getItem('bb-theme') || 'light';</script>
+    <link rel="stylesheet" href="~/lib/bootstrap/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="icon" href="~/img/logo.svg" type="image/svg+xml" />
+    <style>
+        body { min-height: 100vh; display: grid; place-items: center; padding: 1.5rem;
+               background: radial-gradient(circle at 20% 20%, #2a0a12 0, #0b0f19 55%) fixed; }
+        .auth-card { width: 100%; max-width: 410px; border: 0; border-radius: 1rem; box-shadow: 0 25px 60px #0008; }
+    </style>
+</head>
+<body>
+    @RenderBody()
+    <p class="text-center small mt-3 mb-0" style="color:#94a3b8">© @DateTime.UtcNow.Year Bushi Ban International</p>
+</body>
+</html>

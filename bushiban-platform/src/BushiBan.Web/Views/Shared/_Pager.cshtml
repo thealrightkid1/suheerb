@@ -1,0 +1,19 @@
+@model (int Page, int Pages, int Total)
+@{
+    string Url(int p)
+    {
+        var q = Context.Request.Query.Where(kv => kv.Key != "page").Select(kv => $"{kv.Key}={Uri.EscapeDataString(kv.Value.ToString())}").Append($"page={p}");
+        return Context.Request.Path + "?" + string.Join("&", q);
+    }
+}
+<div class="d-flex justify-content-between align-items-center mt-3 small text-body-secondary">
+    <span>@Model.Total.ToString("N0") @(Model.Total == 1 ? "record" : "records")</span>
+    @if (Model.Pages > 1)
+    {
+        <nav><ul class="pagination pagination-sm mb-0">
+            <li class="page-item @(Model.Page <= 1 ? "disabled" : "")"><a class="page-link" href="@Url(Model.Page - 1)">‹ Prev</a></li>
+            <li class="page-item disabled"><span class="page-link">Page @Model.Page of @Model.Pages</span></li>
+            <li class="page-item @(Model.Page >= Model.Pages ? "disabled" : "")"><a class="page-link" href="@Url(Model.Page + 1)">Next ›</a></li>
+        </ul></nav>
+    }
+</div>

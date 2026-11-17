@@ -1,0 +1,5 @@
+@* Usage: <partial name="_DeleteButton" model='("Students", id, "this student")' /> *@
+@model (string Controller, int Id, string What)
+<form method="post" asp-controller="@Model.Controller" asp-action="Delete" asp-route-id="@Model.Id" class="d-inline" data-confirm="Delete @Model.What? You can ask an admin to restore it later.">
+    <button class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
+</form>

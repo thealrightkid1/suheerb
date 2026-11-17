@@ -1,0 +1,59 @@
+@model BushiBan.Web.Infrastructure.Crud.CrudPageModel
+@{
+    ViewData["Title"] = (Model.IsNew ? "Add " : "Edit ") + Model.Singular.ToLowerInvariant();
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { (Model.Title, Url.Action("Index", Model.Controller)), (Model.IsNew ? "Add" : "Edit", null) };
+    string? Error(string name) => ViewContext.ViewData.ModelState.TryGetValue(name, out var e) && e.Errors.Count > 0 ? e.Errors[0].ErrorMessage : null;
+}
+<form method="post" class="card form-card" novalidate>
+    <div class="card-body">
+        <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+        @if (ViewContext.ViewData.ModelState.TryGetValue("", out var top) && top.Errors.Count > 0)
+        {
+            <div class="alert alert-danger">@top.Errors[0].ErrorMessage</div>
+        }
+        <div class="row g-3">
+        @foreach (var f in Model.Fields)
+        {
+            var err = Error(f.Name);
+            var value = f.Value switch { DateOnly d => d.ToString("yyyy-MM-dd"), TimeOnly t => t.ToString("HH:mm"), decimal m => m.ToString(System.Globalization.CultureInfo.InvariantCulture), _ => f.Value?.ToString() };
+            <div class="@(f.Kind == "bool" ? "col-12" : "col-md-6")">
+                @if (f.Kind == "bool")
+                {
+                    <div class="form-check form-switch">
+                        <input type="hidden" name="@f.Name" value="false" />
+                        <input class="form-check-input" type="checkbox" role="switch" id="@f.Name" name="@f.Name" value="true" @(f.Value is true ? "checked" : "") disabled="@f.ReadOnly" />
+                        <label class="form-check-label" for="@f.Name">@f.Label</label>
+                    </div>
+                }
+                else
+                {
+                    <label class="form-label" for="@f.Name">@f.Label @if (f.Required) { <span class="text-danger">*</span> }</label>
+                    @if (f.Kind == "select")
+                    {
+                        <select class="form-select @(err is null ? "" : "is-invalid")" id="@f.Name" name="@f.Name" data-search disabled="@f.ReadOnly">
+                            <option value="">Select…</option>
+                            @foreach (var o in f.Options)
+                            {
+                                if (o.Group is not null && o == f.Options.First(x => x.Group?.Name == o.Group.Name)) { @Html.Raw($"<optgroup label=\"{System.Net.WebUtility.HtmlEncode(o.Group.Name)}\">") }
+                                <option value="@o.Value" selected="@o.Selected">@o.Text</option>
+                                if (o.Group is not null && o == f.Options.Last(x => x.Group?.Name == o.Group.Name)) { @Html.Raw("</optgroup>") }
+                            }
+                        </select>
+                    }
+                    else
+                    {
+                        <input class="form-control @(err is null ? "" : "is-invalid")" id="@f.Name" name="@f.Name" type="@f.Kind" value="@value"
+                               step="@(f.Kind == "number" ? f.Step : null)" maxlength="@f.MaxLength" readonly="@f.ReadOnly" required="@f.Required" />
+                    }
+                    @if (err is not null) { <div class="invalid-feedback d-block">@err</div> }
+                    @if (f.Help is not null) { <div class="form-text">@f.Help</div> }
+                }
+            </div>
+        }
+        </div>
+    </div>
+    <div class="card-footer bg-transparent d-flex gap-2">
+        <button class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>@(Model.IsNew ? "Create" : "Save changes")</button>
+        <a class="btn btn-outline-secondary" asp-controller="@Model.Controller" asp-action="Index">Cancel</a>
+    </div>
+</form>
