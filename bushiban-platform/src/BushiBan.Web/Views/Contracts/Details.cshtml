@@ -1,0 +1,148 @@
+@using BushiBan.Web.Features.Accounting
+@using BushiBan.Web.Features.Billing
+@inject BushiBan.Web.Services.BranchClock Clock
+@model ContractDetailsPage
+@{
+    ViewData["Title"] = $"{Model.Program} contract";
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Contracts", Url.Action("Index")), (Model.Student.Name, null) };
+    var us = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+    var canManage = User.HasPermission(Permissions.Billing.Manage);
+    var billed = Model.Schedule.Count(s => s.InvoiceId is not null);
+}
+@section Head { <link rel="stylesheet" href="@Url.Content(FinanceUi.Stylesheet)" asp-append-version="true" /> }
+@section Scripts { <script src="@Url.Content(FinanceUi.Script)" asp-append-version="true"></script> }
+@section Actions {
+    @if (User.HasPermission(Permissions.Billing.ReceivePayments))
+    {
+        <a class="btn btn-primary" asp-controller="Payments" asp-action="Create" asp-route-studentId="@Model.Student.Id"><i class="bi bi-cash me-1"></i>Receive payment</a>
+    }
+    @if (canManage && Model.CanCancel)
+    {
+        <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelModal"><i class="bi bi-x-octagon me-1"></i>Cancel contract</button>
+    }
+    <button class="btn btn-outline-secondary" data-print><i class="bi bi-printer me-1"></i>Print</button>
+}
+
+<div class="row g-3">
+    <div class="col-lg-4">
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <div class="fs-5 fw-bold">@Model.Student.Name</div>
+                        <div class="small muted">@Model.Student.StudentNo</div>
+                    </div>
+                    @FinanceUi.Badge(Model.Status)
+                </div>
+                <dl class="row small mb-0">
+                    <dt class="col-6 fw-normal muted">Program</dt><dd class="col-6">@Model.Program</dd>
+                    <dt class="col-6 fw-normal muted">Term</dt><dd class="col-6">@Model.TermMonths months</dd>
+                    <dt class="col-6 fw-normal muted">Starts</dt><dd class="col-6">@Format.Date(Model.StartDate)</dd>
+                    <dt class="col-6 fw-normal muted">Ends</dt><dd class="col-6">@Format.Date(Model.EndDate)</dd>
+                    @if (Model.CancelledOn is not null) { <dt class="col-6 fw-normal muted">Cancelled</dt><dd class="col-6 text-danger">@Format.Date(Model.CancelledOn)</dd> }
+                    <dt class="col-6 fw-normal muted">Admission fee</dt><dd class="col-6">@Format.Money(Model.AdmissionFee)</dd>
+                    <dt class="col-6 fw-normal muted">Security deposit</dt><dd class="col-6">@Format.Money(Model.SecurityFee)</dd>
+                    <dt class="col-6 fw-normal muted">Monthly tuition</dt><dd class="col-6">@Format.Money(Model.MonthlyFee)</dd>
+                    @if (Model.MonthlyDiscount > 0) { <dt class="col-6 fw-normal muted">Monthly discount</dt><dd class="col-6">−@Format.Money(Model.MonthlyDiscount)</dd> }
+                    <dt class="col-6 fw-normal muted">Net monthly</dt><dd class="col-6 fw-semibold">@Format.Money(Model.NetMonthly)</dd>
+                    <dt class="col-6 fw-normal muted">Due on day</dt><dd class="col-6">@Model.BillingDay of each month</dd>
+                    <dt class="col-6 fw-normal muted">Pays by</dt><dd class="col-6">@Model.PreferredMethod.DisplayName()</dd>
+                    <dt class="col-6 fw-normal muted">Billed</dt><dd class="col-6">@billed of @Model.TermMonths months</dd>
+                    <dt class="col-6 fw-normal muted">Created</dt><dd class="col-6">@Format.Date(Clock.ToLocal(Model.CreatedAt)) by @(Model.CreatedBy ?? "system")</dd>
+                </dl>
+                @if (!string.IsNullOrWhiteSpace(Model.Notes))
+                {
+                    <hr /><div class="small" style="white-space: pre-line">@Model.Notes</div>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card mb-3">
+            <div class="card-header bg-transparent fw-semibold">Invoices</div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead><tr><th>Invoice</th><th>Date</th><th>Description</th><th class="money">Total</th><th class="money">Balance</th><th>Status</th></tr></thead>
+                    <tbody>
+                    @if (Model.Invoices.Count == 0) { <tr><td colspan="6" class="empty">No invoices yet. Tuition is billed by the monthly billing run.</td></tr> }
+                    @foreach (var i in Model.Invoices)
+                    {
+                        <tr>
+                            <td class="nowrap"><a asp-controller="Invoices" asp-action="Details" asp-route-id="@i.Id" class="fw-medium">@i.InvoiceNo</a></td>
+                            <td class="nowrap">@Format.Date(i.IssueDate)</td>
+                            <td>@i.Description</td>
+                            <td class="money">@Format.Money(i.Total)</td>
+                            <td class="money">@FinanceUi.Money(i.Balance, true)</td>
+                            <td>@FinanceUi.Badge(i.Status, i.Balance > 0 && i.DueDate < Model.Today)</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header bg-transparent fw-semibold">Tuition schedule</div>
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead><tr><th>Month</th><th>Due</th><th>Invoice</th><th class="money">Balance</th><th>Status</th></tr></thead>
+                    <tbody>
+                    @foreach (var s in Model.Schedule)
+                    {
+                        var afterCancel = Model.CancelledOn is { } c && s.Month > new DateOnly(c.Year, c.Month, 1);
+                        <tr class="@(afterCancel && s.InvoiceId is null ? "muted" : "")">
+                            <td>@s.Month.ToString("MMMM yyyy", us)</td>
+                            <td class="nowrap">@Format.Date(s.DueDate)</td>
+                            <td>@if (s.InvoiceId is not null) { <a asp-controller="Invoices" asp-action="Details" asp-route-id="@s.InvoiceId">@s.InvoiceNo</a> }</td>
+                            <td class="money">@if (s.Balance is not null) { @FinanceUi.Money(s.Balance.Value, true) }</td>
+                            <td>
+                                @if (s.Status is not null) { @FinanceUi.Badge(s.Status.Value, s.Balance > 0 && s.DueDate < Model.Today) }
+                                else if (afterCancel || Model.Status == ContractStatus.Cancelled) { <span class="small">Not billed (cancelled)</span> }
+                                else if (Model.NetMonthly == 0) { <span class="small muted">No charge</span> }
+                                else { <span class="small muted">Not billed yet</span> }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (canManage && Model.CanCancel && Model.Quote is not null)
+{
+    <div class="modal fade" id="cancelModal" tabindex="-1" aria-labelledby="cancelTitle" aria-hidden="true">
+        <div class="modal-dialog">
+            <form method="post" asp-action="Cancel" asp-route-id="@Model.Id" class="modal-content" data-cancel-form data-quote-url="@Url.Action("Quote", new { id = Model.Id })"
+                  data-confirm="Cancel this contract? No more tuition will be billed.">
+                <div class="modal-header"><h2 class="modal-title fs-5" id="cancelTitle">Cancel contract</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label" for="cancelDate">Cancellation date</label>
+                        <input class="form-control" type="date" id="cancelDate" name="date" value="@FinanceUi.Iso(Model.Today)" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="cancelReason">Reason <span class="text-danger">*</span></label>
+                        <input class="form-control" id="cancelReason" name="reason" maxlength="200" required placeholder="e.g. Moving out of the area" />
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="chargeFee" name="chargeFee" value="true" checked="@(Model.Quote.SuggestedFee > 0)" />
+                        <label class="form-check-label" for="chargeFee">Charge a cancellation fee</label>
+                    </div>
+                    <div class="input-group mb-1">
+                        <span class="input-group-text">$</span>
+                        <input class="form-control" type="number" step="0.01" min="0" name="fee" value="@Model.Quote.SuggestedFee.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" aria-label="Cancellation fee" />
+                    </div>
+                    <div class="form-text" data-quote-note>
+                        @Model.Quote.RemainingMonths month(s) left after this date: @Format.Money(Model.Quote.Remainder). The agreement's fee is $250.00 or the remainder, whichever is less. Change it if you agreed something else.
+                    </div>
+                    <p class="small text-body-secondary mt-3 mb-0">Invoices already issued stay as they are. Void any that shouldn't be paid, and refund the security deposit separately if it's due.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Keep contract</button>
+                    <button class="btn btn-danger">Cancel contract</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}

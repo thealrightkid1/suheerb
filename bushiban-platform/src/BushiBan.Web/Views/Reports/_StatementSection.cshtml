@@ -1,0 +1,22 @@
+@* One section of a statement (revenue, expenses, assets…): sub-account groups with their detail accounts and a subtotal. *@
+@using BushiBan.Web.Features.Accounting
+@model (string Title, IReadOnlyList<StatementGroup> Groups, decimal Total, string TotalLabel, string LedgerQuery)
+<tr class="section-row"><td colspan="3">@Model.Title</td></tr>
+@if (Model.Groups.Count == 0)
+{
+    <tr><td></td><td class="muted">Nothing posted.</td><td class="money">@Format.Money(0)</td></tr>
+}
+@foreach (var g in Model.Groups)
+{
+    <tr class="group-row"><td class="nowrap">@g.Code</td><td>@g.Name</td><td></td></tr>
+    @foreach (var l in g.Lines)
+    {
+        <tr>
+            <td class="nowrap indent-1 muted">@l.Code</td>
+            <td class="indent-1"><a href="@Url.Action("Ledger", new { code = l.Code })&@Model.LedgerQuery">@l.Name</a></td>
+            <td class="money">@FinanceUi.Money(l.Amount)</td>
+        </tr>
+    }
+    <tr class="subtotal"><td></td><td class="indent-1">Total @g.Name.ToLowerInvariant()</td><td class="money">@FinanceUi.Money(g.Total)</td></tr>
+}
+<tr class="subtotal"><td></td><td>@Model.TotalLabel</td><td class="money">@FinanceUi.Money(Model.Total)</td></tr>

@@ -1,0 +1,95 @@
+@using BushiBan.Web.Features.Accounting
+@using BushiBan.Web.Features.Billing
+@model InvoiceIndexPage
+@{
+    ViewData["Title"] = "Invoices";
+    var f = Model.Filter;
+    var filtered = f.Status != null || f.Overdue || f.Unpaid || f.StudentId != null || f.From != null || f.To != null || !string.IsNullOrWhiteSpace(f.Q);
+}
+@section Head { <link rel="stylesheet" href="@Url.Content(FinanceUi.Stylesheet)" asp-append-version="true" /> }
+@section Actions {
+    @if (User.HasPermission(Permissions.Billing.ReceivePayments))
+    {
+        <a class="btn btn-outline-primary" asp-controller="Payments" asp-action="Create" asp-route-studentId="@f.StudentId"><i class="bi bi-cash me-1"></i>Receive payment</a>
+    }
+    @if (User.HasPermission(Permissions.Billing.Manage))
+    {
+        <a class="btn btn-primary" asp-action="Create" asp-route-studentId="@f.StudentId"><i class="bi bi-plus-lg me-1"></i>New invoice</a>
+    }
+}
+<div class="card">
+    <div class="card-header bg-transparent">
+        <form method="get" class="row g-2 align-items-end filter-bar">
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" for="Q">Search</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input class="form-control" id="Q" name="Q" value="@f.Q" placeholder="Invoice no, student or description" />
+                </div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" for="StudentId">Student</label>
+                <select class="form-select" id="StudentId" name="StudentId" data-search asp-items="Model.Students"><option value="">All students</option></select>
+            </div>
+            <div class="col-6 col-sm-3 col-lg-2">
+                <label class="form-label" for="From">Issued from</label>
+                <input class="form-control" type="date" id="From" name="From" value="@FinanceUi.Iso(f.From)" />
+            </div>
+            <div class="col-6 col-sm-3 col-lg-2">
+                <label class="form-label" for="To">to</label>
+                <input class="form-control" type="date" id="To" name="To" value="@FinanceUi.Iso(f.To)" />
+            </div>
+            <div class="col-6 col-sm-3 col-lg-2">
+                <label class="form-label" for="Status">Status</label>
+                <select class="form-select" id="Status" name="Status" asp-items="EnumHelpers.SelectList(f.Status)"><option value="">All</option></select>
+            </div>
+            <div class="col-auto pb-2">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="Unpaid" name="Unpaid" value="true" @(f.Unpaid ? "checked" : "") />
+                    <label class="form-check-label" for="Unpaid">Unpaid only</label>
+                </div>
+            </div>
+            <div class="col-auto pb-2">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="Overdue" name="Overdue" value="true" @(f.Overdue ? "checked" : "") />
+                    <label class="form-check-label" for="Overdue">Overdue only</label>
+                </div>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filter</button>
+                @if (filtered) { <a class="btn btn-link" asp-action="Index">Clear</a> }
+            </div>
+        </form>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Invoice</th><th>Date</th><th>Due</th><th>Student</th><th>Description</th><th class="money">Total</th><th class="money">Paid</th><th class="money">Balance</th><th>Status</th></tr></thead>
+            <tbody>
+            @if (Model.Rows.Items.Count == 0)
+            {
+                <tr><td colspan="9" class="empty">@(filtered ? "No invoices match these filters." : "No invoices yet. They're created by contracts, the monthly billing run, or New invoice.")</td></tr>
+            }
+            @foreach (var i in Model.Rows.Items)
+            {
+                var overdue = i.Balance > 0 && i.DueDate < Model.Today;
+                <tr>
+                    <td class="nowrap"><a asp-action="Details" asp-route-id="@i.Id" class="fw-medium">@i.InvoiceNo</a></td>
+                    <td class="nowrap">@Format.Date(i.IssueDate)</td>
+                    <td class="nowrap @(overdue ? "text-danger" : "")">@Format.Date(i.DueDate)</td>
+                    <td><a asp-action="Index" asp-route-studentId="@i.StudentId">@i.StudentName</a></td>
+                    <td>@i.Description</td>
+                    <td class="money">@Format.Money(i.Total)</td>
+                    <td class="money">@FinanceUi.Money(i.Paid, true)</td>
+                    <td class="money fw-semibold">@FinanceUi.Money(i.Balance, true)</td>
+                    <td>@FinanceUi.Badge(i.Status, overdue)</td>
+                </tr>
+            }
+            </tbody>
+            @if (Model.FilteredBalance > 0)
+            {
+                <tfoot><tr><td colspan="7" class="text-end fw-semibold">Still owed on these invoices</td><td class="money fw-bold">@Format.Money(Model.FilteredBalance)</td><td></td></tr></tfoot>
+            }
+        </table>
+    </div>
+</div>
+<partial name="_Pager" model="(Model.Rows.Page, Model.Rows.Pages, Model.Rows.Total)" />

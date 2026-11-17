@@ -1,0 +1,60 @@
+@using BushiBan.Web.Features.Accounting
+@model ReportPage<BalanceSheetReport>
+@{
+    ViewData["Title"] = "Balance sheet";
+    var r = Model.Report!;
+    var f = Model.Filter;
+    var period = $"As of {Format.Date(r.AsOf)}";
+    var ledgerQuery = $"to={FinanceUi.Iso(r.AsOf)}" + (f.Consolidated ? "&consolidated=true" : "");
+}
+@section Head { <link rel="stylesheet" href="@Url.Content(FinanceUi.Stylesheet)" asp-append-version="true" /> }
+@section Scripts { <script src="@Url.Content(FinanceUi.Script)" asp-append-version="true"></script> }
+@section Actions { <partial name="_ReportActions" /> }
+<partial name="_PrintHeader" model='("Balance sheet", Model.Scope, period)' />
+
+<div class="card" style="max-width: 980px">
+    <div class="card-header bg-transparent">
+        <form method="get" class="row g-2 align-items-end filter-bar">
+            <partial name="_PeriodFilter" model="(f, Model.CanConsolidate, true)" />
+            <div class="col-auto"><button class="btn btn-outline-secondary"><i class="bi bi-arrow-repeat me-1"></i>Update</button></div>
+        </form>
+        <div class="small muted mt-2 no-print" data-scope="@Model.Scope">@Model.Scope · @period</div>
+    </div>
+    <div class="table-responsive">
+        <table class="table align-middle mb-0 report-table">
+            <colgroup><col style="width: 9rem" /><col /><col style="width: 11rem" /></colgroup>
+            <tbody>
+                <partial name="_StatementSection" model='("Assets", r.Assets, r.TotalAssets, "Total assets", ledgerQuery)' />
+                <partial name="_StatementSection" model='("Liabilities", r.Liabilities, r.TotalLiabilities, "Total liabilities", ledgerQuery)' />
+                <tr class="section-row"><td colspan="3">Equity</td></tr>
+                @foreach (var g in r.Equity)
+                {
+                    <tr class="group-row"><td class="nowrap">@g.Code</td><td>@g.Name</td><td></td></tr>
+                    @foreach (var l in g.Lines)
+                    {
+                        <tr><td class="nowrap indent-1 muted">@l.Code</td><td class="indent-1">@l.Name</td><td class="money">@FinanceUi.Money(l.Amount)</td></tr>
+                    }
+                }
+                <tr>
+                    <td></td>
+                    <td>Earnings to date <span class="small muted">(revenue minus expenses, not yet closed to retained earnings)</span></td>
+                    <td class="money">@FinanceUi.Money(r.EarningsToDate)</td>
+                </tr>
+                <tr class="subtotal"><td></td><td>Total equity</td><td class="money">@FinanceUi.Money(r.TotalEquity)</td></tr>
+            </tbody>
+            <tfoot>
+                <tr class="total"><td></td><td>Total liabilities and equity</td><td class="money">@FinanceUi.Money(r.LiabilitiesAndEquity)</td></tr>
+            </tfoot>
+        </table>
+    </div>
+    <div class="card-footer bg-transparent small">
+        @if (r.Balanced)
+        {
+            <span class="check-ok"><i class="bi bi-check-circle-fill me-1"></i>Check: Assets = Liabilities + Equity (@Format.Money(r.TotalAssets)).</span>
+        }
+        else
+        {
+            <span class="check-bad"><i class="bi bi-exclamation-triangle-fill me-1"></i>Check failed: Assets = Liabilities + Equity is off by @Format.Money(Math.Abs(r.TotalAssets - r.LiabilitiesAndEquity)). Please tell your administrator.</span>
+        }
+    </div>
+</div>

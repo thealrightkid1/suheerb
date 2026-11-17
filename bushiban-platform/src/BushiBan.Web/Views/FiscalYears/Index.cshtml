@@ -1,0 +1,54 @@
+@using BushiBan.Web.Features.Accounting
+@model PagedList<FiscalYearRow>
+@{
+    ViewData["Title"] = "Fiscal years";
+    var canManage = User.HasPermission(Permissions.FiscalYears.Manage);
+}
+@section Head { <link rel="stylesheet" href="@Url.Content(FinanceUi.Stylesheet)" asp-append-version="true" /> }
+@section Actions {
+    @if (canManage) { <a class="btn btn-primary" asp-action="Create"><i class="bi bi-plus-lg me-1"></i>Add fiscal year</a> }
+}
+<p class="text-body-secondary">Closing a year locks it: no voucher dated inside a closed year can be added or posted. You can reopen it if a correction is needed.</p>
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Name</th><th>Start</th><th>End</th><th class="text-end">Posted vouchers</th><th class="text-end">Drafts</th><th>Status</th>@if (canManage) { <th class="text-end">Actions</th> }</tr></thead>
+            <tbody>
+            @if (Model.Items.Count == 0) { <tr><td colspan="7" class="empty">No fiscal years yet. Add one so vouchers are grouped by year.</td></tr> }
+            @foreach (var y in Model.Items)
+            {
+                <tr>
+                    <td class="fw-medium">@y.Name @if (!y.IsActive) { <span class="badge text-bg-light ms-1">Inactive</span> }</td>
+                    <td>@Format.Date(y.StartDate)</td>
+                    <td>@Format.Date(y.EndDate)</td>
+                    <td class="text-end">@y.Vouchers.ToString("N0")</td>
+                    <td class="text-end">@(y.Drafts == 0 ? "" : y.Drafts.ToString("N0"))</td>
+                    <td>@(y.IsClosed ? FinanceUi.Badge("st-cancelled", "Closed") : FinanceUi.Badge("st-active", "Open"))</td>
+                    @if (canManage)
+                    {
+                        <td class="text-end text-nowrap">
+                            <div class="d-inline-flex gap-1">
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="Edit" asp-route-id="@y.Id" title="Edit"><i class="bi bi-pencil"></i></a>
+                                @if (y.IsClosed)
+                                {
+                                    <form method="post" asp-action="Reopen" asp-route-id="@y.Id" data-confirm="Reopen @y.Name? Vouchers can then be added and posted in it again.">
+                                        <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-unlock me-1"></i>Reopen</button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <form method="post" asp-action="Close" asp-route-id="@y.Id" data-confirm="Close @y.Name? No vouchers dated @Format.Date(y.StartDate) to @Format.Date(y.EndDate) can be added or posted after this.">
+                                        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-lock me-1"></i>Close year</button>
+                                    </form>
+                                    <partial name="_DeleteButton" model='("FiscalYears", y.Id, "fiscal year " + y.Name)' />
+                                }
+                            </div>
+                        </td>
+                    }
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+<partial name="_Pager" model="(Model.Page, Model.Pages, Model.Total)" />

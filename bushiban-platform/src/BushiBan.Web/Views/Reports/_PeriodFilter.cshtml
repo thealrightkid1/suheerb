@@ -1,0 +1,30 @@
+@* Shared filter fields: from/to dates (or as-of) and, for system admins, the consolidated switch. *@
+@using BushiBan.Web.Features.Accounting
+@model (ReportFilter Filter, bool CanConsolidate, bool AsOf)
+@if (Model.AsOf)
+{
+    <div class="col-6 col-sm-4 col-lg-2">
+        <label class="form-label" for="AsOf">As of</label>
+        <input class="form-control" type="date" id="AsOf" name="AsOf" value="@FinanceUi.Iso(Model.Filter.AsOf)" />
+    </div>
+}
+else
+{
+    <div class="col-6 col-sm-4 col-lg-2">
+        <label class="form-label" for="From">From</label>
+        <input class="form-control" type="date" id="From" name="From" value="@FinanceUi.Iso(Model.Filter.From)" />
+    </div>
+    <div class="col-6 col-sm-4 col-lg-2">
+        <label class="form-label" for="To">To</label>
+        <input class="form-control" type="date" id="To" name="To" value="@FinanceUi.Iso(Model.Filter.To)" />
+    </div>
+}
+@if (Model.CanConsolidate)
+{
+    <div class="col-auto pb-2">
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" id="Consolidated" name="Consolidated" value="true" @(Model.Filter.Consolidated ? "checked" : "") />
+            <label class="form-check-label" for="Consolidated">All branches (consolidated)</label>
+        </div>
+    </div>
+}

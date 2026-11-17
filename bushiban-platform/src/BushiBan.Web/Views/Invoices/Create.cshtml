@@ -1,0 +1,90 @@
+@using BushiBan.Web.Features.Accounting
+@using BushiBan.Web.Features.Billing
+@model InvoiceFormPage
+@{
+    ViewData["Title"] = "New invoice";
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Invoices", Url.Action("Index")), ("New", null) };
+    var form = Model.Form;
+    var errors = ViewContext.ViewData.ModelState.Where(kv => kv.Value!.Errors.Count > 0).SelectMany(kv => kv.Value!.Errors.Select(e => e.ErrorMessage)).Distinct().ToList();
+    string Amount(decimal? v) => v is null or 0 ? "" : v.Value.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+    async Task AccountOptions(int? selected)
+    {
+        foreach (var g in Model.Accounts.GroupBy(a => a.Group?.Name ?? ""))
+        {
+            <optgroup label="@g.Key">
+                @foreach (var a in g) { <option value="@a.Value" selected="@(a.Value == selected?.ToString())">@a.Text</option> }
+            </optgroup>
+        }
+    }
+}
+@section Head { <link rel="stylesheet" href="@Url.Content(FinanceUi.Stylesheet)" asp-append-version="true" /> }
+@section Scripts { <script src="@Url.Content(FinanceUi.Script)" asp-append-version="true"></script> }
+
+<template data-line-template="Lines">
+    <tr>
+        <td class="line-no"></td>
+        <td><input class="form-control" name="Lines[__i__].Description" maxlength="200" placeholder="e.g. Uniform, size 3" /></td>
+        <td><select class="form-select" name="Lines[__i__].AccountId" data-search>@{ await AccountOptions(Model.DefaultAccountId); }</select></td>
+        <td><input class="form-control money" name="Lines[__i__].Amount" type="number" step="0.01" min="0" inputmode="decimal" data-amount /></td>
+        <td class="text-end"><button type="button" class="btn btn-sm btn-outline-secondary" data-remove-line title="Remove line"><i class="bi bi-x-lg"></i></button></td>
+    </tr>
+</template>
+
+<form method="post" asp-action="Create" class="card" novalidate>
+    <div class="card-body">
+        @if (errors.Count > 0)
+        {
+            <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>@if (errors.Count == 1) { @errors[0] } else { <ul class="mb-0">@foreach (var e in errors) { <li>@e</li> }</ul> }</div>
+        }
+        <p class="text-body-secondary">For one-off charges such as uniforms, gear or events. Tuition is billed from contracts.</p>
+        <div class="row g-3">
+            <div class="col-md-6 col-lg-4">
+                <label class="form-label" for="StudentId">Student <span class="text-danger">*</span></label>
+                <select class="form-select" id="StudentId" name="StudentId" data-search asp-items="Model.Students"><option value="">Pick a student…</option></select>
+            </div>
+            <div class="col-sm-6 col-lg-2">
+                <label class="form-label" for="IssueDate">Invoice date</label>
+                <input class="form-control" type="date" id="IssueDate" name="IssueDate" value="@FinanceUi.Iso(form.IssueDate)" required />
+            </div>
+            <div class="col-sm-6 col-lg-2">
+                <label class="form-label" for="DueDate">Due date</label>
+                <input class="form-control" type="date" id="DueDate" name="DueDate" value="@FinanceUi.Iso(form.DueDate)" required />
+            </div>
+            <div class="col-lg-4">
+                <label class="form-label" for="Description">Description <span class="text-danger">*</span></label>
+                <input class="form-control" id="Description" name="Description" value="@form.Description" maxlength="300" placeholder="e.g. Sparring gear" required />
+            </div>
+        </div>
+        <h2 class="form-section-title mt-4">Lines</h2>
+        <div class="table-responsive">
+            <table class="table lines-table mb-0" data-lines="Lines" data-invoice-lines>
+                <thead><tr><th>#</th><th>Item</th><th style="min-width:260px">Income account</th><th class="money" style="width:160px">Amount</th><th></th></tr></thead>
+                <tbody data-lines-body>
+                @for (var i = 0; i < form.Lines.Count; i++)
+                {
+                    var l = form.Lines[i];
+                    <tr>
+                        <td class="line-no">@(i + 1)</td>
+                        <td><input class="form-control" name="Lines[@i].Description" value="@l.Description" maxlength="200" placeholder="e.g. Uniform, size 3" /></td>
+                        <td><select class="form-select" name="Lines[@i].AccountId" data-search>@{ await AccountOptions(l.AccountId ?? Model.DefaultAccountId); }</select></td>
+                        <td><input class="form-control money" name="Lines[@i].Amount" type="number" step="0.01" min="0" inputmode="decimal" value="@Amount(l.Amount)" data-amount /></td>
+                        <td class="text-end"><button type="button" class="btn btn-sm btn-outline-secondary" data-remove-line title="Remove line"><i class="bi bi-x-lg"></i></button></td>
+                    </tr>
+                }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td></td>
+                        <td colspan="2"><button type="button" class="btn btn-sm btn-outline-primary" data-add-line="Lines"><i class="bi bi-plus-lg me-1"></i>Add line</button></td>
+                        <td class="money" data-total="invoice">$0.00</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+    <div class="card-footer bg-transparent d-flex gap-2">
+        <button class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Create invoice</button>
+        <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+    </div>
+</form>

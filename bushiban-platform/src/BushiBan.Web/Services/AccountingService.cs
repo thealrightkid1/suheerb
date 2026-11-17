@@ -41,8 +41,11 @@ public class AccountingService
         string? sourceReference = null, VoucherStatus status = VoucherStatus.Posted, CancellationToken ct = default)
     {
         var branchId = _branch.BranchId ?? throw new AccountingException("Pick a branch first.");
+        if (status == VoucherStatus.Reversed) throw new AccountingException("A voucher can only be saved as a draft or posted.");
+        if (string.IsNullOrWhiteSpace(description)) throw new AccountingException("Enter a description for the voucher.");
         var entries = lines.Where(l => l.Debit != 0 || l.Credit != 0).ToList();
-        await ValidateAsync(branchId, date, entries, ct);
+        if (status == VoucherStatus.Draft) await ValidateDraftAsync(entries, ct);
+        else await ValidateAsync(branchId, date, entries, ct);
 
         var fy = await FiscalYearForAsync(date, ct);
         var voucher = new Voucher
@@ -55,17 +58,58 @@ public class AccountingService
             Status = status,
             FiscalYearId = fy?.Id,
             SourceReference = sourceReference,
-            Entries = entries.Select(l => new VoucherEntry
-            {
-                DetailAccountId = l.DetailAccountId,
-                Debit = Math.Round(l.Debit, 2),
-                Credit = Math.Round(l.Credit, 2),
-                Narration = l.Narration,
-            }).ToList(),
+            Entries = entries.Select(ToEntry).ToList(),
         };
         _db.Vouchers.Add(voucher);
         return voucher;
     }
+
+    /// <summary>
+    /// Replaces the header and lines of a draft voucher (not saved). Drafts may be unbalanced; they are checked in full when posted.
+    /// The voucher gets a new number if its type or year changes, so the number always matches its prefix.
+    /// </summary>
+    public async Task<Voucher> UpdateDraftAsync(int voucherId, VoucherType type, DateOnly date, string description, IEnumerable<Line> lines, CancellationToken ct = default)
+    {
+        var branchId = _branch.BranchId ?? throw new AccountingException("Pick a branch first.");
+        var voucher = await _db.Vouchers.Include(v => v.Entries).FirstOrDefaultAsync(v => v.Id == voucherId, ct)
+            ?? throw new AccountingException("Voucher not found.");
+        if (voucher.Status != VoucherStatus.Draft) throw new AccountingException("Only draft vouchers can be edited. Reverse a posted voucher instead.");
+        if (string.IsNullOrWhiteSpace(description)) throw new AccountingException("Enter a description for the voucher.");
+        var entries = lines.Where(l => l.Debit != 0 || l.Credit != 0).ToList();
+        await ValidateDraftAsync(entries, ct);
+
+        if (type != voucher.Type || date.Year != voucher.Date.Year)
+            voucher.VoucherNo = await _numbers.NextFormattedAsync(branchId, Prefix(type), date.Year, ct);
+        voucher.Type = type;
+        voucher.Date = date;
+        voucher.Description = description.Trim();
+        voucher.FiscalYearId = (await FiscalYearForAsync(date, ct))?.Id;
+        _db.VoucherEntries.RemoveRange(voucher.Entries);
+        voucher.Entries = entries.Select(ToEntry).ToList();
+        return voucher;
+    }
+
+    /// <summary>Checks a draft in full (balanced, open fiscal year) and posts it (not saved).</summary>
+    public async Task<Voucher> PostDraftAsync(int voucherId, CancellationToken ct = default)
+    {
+        var branchId = _branch.BranchId ?? throw new AccountingException("Pick a branch first.");
+        var voucher = await _db.Vouchers.Include(v => v.Entries).FirstOrDefaultAsync(v => v.Id == voucherId, ct)
+            ?? throw new AccountingException("Voucher not found.");
+        if (voucher.Status != VoucherStatus.Draft) throw new AccountingException("This voucher is already posted.");
+        await ValidateAsync(branchId, voucher.Date,
+            voucher.Entries.Select(e => new Line(e.DetailAccountId, e.Debit, e.Credit, e.Narration)).ToList(), ct);
+        voucher.Status = VoucherStatus.Posted;
+        voucher.FiscalYearId = (await FiscalYearForAsync(voucher.Date, ct))?.Id;
+        return voucher;
+    }
+
+    private static VoucherEntry ToEntry(Line l) => new()
+    {
+        DetailAccountId = l.DetailAccountId,
+        Debit = Math.Round(l.Debit, 2),
+        Credit = Math.Round(l.Credit, 2),
+        Narration = string.IsNullOrWhiteSpace(l.Narration) ? null : l.Narration.Trim(),
+    };
 
     /// <summary>Creates the mirror-image voucher and marks the original as reversed.</summary>
     public async Task<Voucher> ReverseAsync(int voucherId, DateOnly date, string reason, CancellationToken ct = default)
@@ -98,6 +142,17 @@ public class AccountingService
 
         var fy = await FiscalYearForAsync(date, ct);
         if (fy is { IsClosed: true }) throw new AccountingException($"Fiscal year {fy.Name} is closed. Pick a date in an open year.");
+    }
+
+    /// <summary>Lighter checks for drafts: lines must be sensible, but debits and credits may not match yet.</summary>
+    public async Task ValidateDraftAsync(IReadOnlyCollection<Line> entries, CancellationToken ct = default)
+    {
+        if (entries.Count == 0) throw new AccountingException("Add at least one line with an amount.");
+        if (entries.Any(l => l.Debit < 0 || l.Credit < 0)) throw new AccountingException("Amounts can't be negative.");
+        if (entries.Any(l => l.Debit != 0 && l.Credit != 0)) throw new AccountingException("Each line is either a debit or a credit, not both.");
+        var ids = entries.Select(l => l.DetailAccountId).Distinct().ToList();
+        var found = await _db.DetailAccounts.Where(a => ids.Contains(a.Id) && a.IsActive).CountAsync(ct);
+        if (found != ids.Count) throw new AccountingException("One of the accounts doesn't exist or is inactive.");
     }
 
     public Task<FiscalYear?> FiscalYearForAsync(DateOnly date, CancellationToken ct = default) =>

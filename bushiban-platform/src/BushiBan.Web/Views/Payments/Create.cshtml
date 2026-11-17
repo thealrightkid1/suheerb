@@ -1,0 +1,119 @@
+@using BushiBan.Web.Features.Accounting
+@using BushiBan.Web.Features.Billing
+@model PaymentFormPage
+@{
+    ViewData["Title"] = "Receive payment";
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Payments", Url.Action("Index")), ("Receive", null) };
+    var form = Model.Form;
+    var errors = ViewContext.ViewData.ModelState.Where(kv => kv.Value!.Errors.Count > 0).SelectMany(kv => kv.Value!.Errors.Select(e => e.ErrorMessage)).Distinct().ToList();
+    var typed = form.Allocations.Where(a => a.Amount is not null).ToDictionary(a => a.InvoiceId, a => a.Amount!.Value);
+    string M(decimal? v) => v is null ? "" : v.Value.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+    var totalDue = Model.OpenInvoices.Sum(i => i.Balance);
+}
+@section Head { <link rel="stylesheet" href="@Url.Content(FinanceUi.Stylesheet)" asp-append-version="true" /> }
+@section Scripts { <script src="@Url.Content(FinanceUi.Script)" asp-append-version="true"></script> }
+
+<form method="post" asp-action="Create" class="card form-card" novalidate data-payment-form>
+    <div class="card-body">
+        @if (errors.Count > 0)
+        {
+            <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>@if (errors.Count == 1) { @errors[0] } else { <ul class="mb-0">@foreach (var e in errors) { <li>@e</li> }</ul> }</div>
+        }
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label" for="StudentId">Student <span class="text-danger">*</span></label>
+                <select class="form-select" id="StudentId" name="StudentId" data-search data-reload="studentId" asp-items="Model.Students"><option value="">Pick a student…</option></select>
+            </div>
+            @if (Model.Balance is { } b)
+            {
+                <div class="col-md-6 d-flex align-items-end gap-4 small">
+                    <div><div class="muted">Owed</div><div class="fs-5 fw-bold">@Format.Money(b.Open)</div></div>
+                    <div><div class="muted">Overdue</div><div class="fs-5 fw-bold @(b.Overdue > 0 ? "text-danger" : "")">@Format.Money(b.Overdue)</div></div>
+                    <div><div class="muted">Credit on account</div><div class="fs-5 fw-bold">@Format.Money(b.Credit)</div></div>
+                </div>
+            }
+        </div>
+
+        @if (form.StudentId is not null)
+        {
+            <h2 class="form-section-title mt-4">Payment</h2>
+            <div class="row g-3">
+                <div class="col-sm-6 col-md-3">
+                    <label class="form-label" for="Amount">Amount received <span class="text-danger">*</span></label>
+                    <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input class="form-control" type="number" step="0.01" min="0.01" id="Amount" name="Amount" value="@M(form.Amount)" required data-payment-amount autofocus />
+                    </div>
+                    @if (totalDue > 0) { <a href="#" class="small" data-pay-full>Pay everything owed (@Format.Money(totalDue))</a> }
+                </div>
+                <div class="col-sm-6 col-md-3">
+                    <label class="form-label" for="Date">Date received</label>
+                    <input class="form-control" type="date" id="Date" name="Date" value="@FinanceUi.Iso(form.Date)" required />
+                </div>
+                <div class="col-sm-6 col-md-3">
+                    <label class="form-label" for="Method">Method</label>
+                    <select class="form-select" id="Method" name="Method" asp-items="EnumHelpers.SelectList<PaymentMethod>(form.Method)"></select>
+                </div>
+                <div class="col-sm-6 col-md-3">
+                    <label class="form-label" for="Reference">Reference</label>
+                    <input class="form-control" id="Reference" name="Reference" value="@form.Reference" maxlength="100" placeholder="Check no., last 4 digits…" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="DepositAccountId">Deposit to</label>
+                    <select class="form-select" id="DepositAccountId" name="DepositAccountId" asp-items="Model.DepositAccounts">
+                        <option value="">Automatic (cash drawer or bank)</option>
+                    </select>
+                </div>
+            </div>
+
+            <h2 class="form-section-title mt-4">Apply to invoices</h2>
+            @if (Model.OpenInvoices.Count == 0)
+            {
+                <p class="text-body-secondary mb-0">@Model.Students.FirstOrDefault(s => s.Selected)?.Text has no open invoices. The whole payment will be kept as credit and used on their next invoice.</p>
+            }
+            else
+            {
+                <p class="small text-body-secondary">Filled in oldest first as you type the amount. Change any amount to apply it differently; anything not applied stays as credit on the account.</p>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-2 lines-table">
+                        <thead><tr><th>Invoice</th><th>Due</th><th>Description</th><th class="money">Total</th><th class="money">Still owed</th><th class="money" style="width: 160px">Apply</th></tr></thead>
+                        <tbody>
+                        @for (var i = 0; i < Model.OpenInvoices.Count; i++)
+                        {
+                            var inv = Model.OpenInvoices[i];
+                            var overdue = inv.DueDate < Model.Today;
+                            <tr>
+                                <td class="nowrap"><a asp-controller="Invoices" asp-action="Details" asp-route-id="@inv.Id" target="_blank">@inv.InvoiceNo</a></td>
+                                <td class="nowrap @(overdue ? "text-danger" : "")">@Format.Date(inv.DueDate)</td>
+                                <td>@inv.Description</td>
+                                <td class="money">@Format.Money(inv.Total)</td>
+                                <td class="money fw-semibold">@Format.Money(inv.Balance)</td>
+                                <td>
+                                    <input type="hidden" name="Allocations[@i].InvoiceId" value="@inv.Id" />
+                                    <input class="form-control money" type="number" step="0.01" min="0" max="@M(inv.Balance)" name="Allocations[@i].Amount"
+                                           value="@(typed.TryGetValue(inv.Id, out var t) ? M(t) : "")" data-allocation data-balance="@M(inv.Balance)" aria-label="Amount applied to @inv.InvoiceNo" />
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="d-flex justify-content-between flex-wrap gap-2 small">
+                    <span data-allocation-summary></span>
+                    <a href="#" data-reset-allocation>Fill oldest first again</a>
+                </div>
+            }
+        }
+        else
+        {
+            <p class="text-body-secondary mt-3 mb-0">Pick a student to see what they owe.</p>
+        }
+    </div>
+    @if (form.StudentId is not null)
+    {
+        <div class="card-footer bg-transparent d-flex gap-2">
+            <button class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Record payment</button>
+            <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+        </div>
+    }
+</form>

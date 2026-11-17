@@ -1,0 +1,129 @@
+@using BushiBan.Web.Features.Accounting
+@using BushiBan.Web.Features.Billing
+@model BillingOverview
+@{
+    ViewData["Title"] = "Billing";
+    var today = (DateOnly)ViewData["Today"]!;
+    var canManage = User.HasPermission(Permissions.Billing.Manage);
+    var month = today.ToString("MMMM yyyy", System.Globalization.CultureInfo.GetCultureInfo("en-US"));
+    var agingTotal = Model.Outstanding;
+    string Pct(decimal part) => agingTotal == 0 ? "0" : (part / agingTotal * 100).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+}
+@section Head { <link rel="stylesheet" href="@Url.Content(FinanceUi.Stylesheet)" asp-append-version="true" /> }
+@section Actions {
+    @if (User.HasPermission(Permissions.Billing.ReceivePayments))
+    {
+        <a class="btn btn-primary" asp-controller="Payments" asp-action="Create"><i class="bi bi-cash me-1"></i>Receive payment</a>
+    }
+    @if (canManage)
+    {
+        <form method="post" asp-action="RunMonthly" data-confirm="Bill tuition for every active contract through @month? Months that are already billed are skipped, so it's safe to run again.">
+            <button class="btn btn-outline-primary"><i class="bi bi-calendar-check me-1"></i>Run monthly billing</button>
+        </form>
+        <form method="post" asp-action="ApplyLateFees" data-confirm="Add a late fee to each unpaid tuition invoice that is past its grace period? Each invoice is only ever charged once.">
+            <button class="btn btn-outline-secondary"><i class="bi bi-alarm me-1"></i>Apply late fees</button>
+        </form>
+    }
+}
+
+<div class="row g-3 mb-3">
+    <div class="col-sm-6 col-xl-3">
+        <a class="tile-link" asp-controller="Invoices" asp-action="Index" asp-route-from="@FinanceUi.Iso(new DateOnly(today.Year, today.Month, 1))" asp-route-to="@FinanceUi.Iso(new DateOnly(today.Year, today.Month, 1).AddMonths(1).AddDays(-1))">
+            <div class="card h-100"><div class="card-body stat">
+                <div class="stat-icon tint-blue"><i class="bi bi-receipt"></i></div>
+                <div><div class="stat-value">@Format.Money(Model.BilledThisMonth)</div><div class="stat-label">Billed in @month</div></div>
+            </div></div>
+        </a>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <a class="tile-link" asp-controller="Payments" asp-action="Index" asp-route-from="@FinanceUi.Iso(new DateOnly(today.Year, today.Month, 1))" asp-route-to="@FinanceUi.Iso(today)">
+            <div class="card h-100"><div class="card-body stat">
+                <div class="stat-icon tint-green"><i class="bi bi-cash-stack"></i></div>
+                <div><div class="stat-value">@Format.Money(Model.CollectedThisMonth)</div><div class="stat-label">Collected in @month</div></div>
+            </div></div>
+        </a>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <a class="tile-link" asp-controller="Invoices" asp-action="Index" asp-route-unpaid="true">
+            <div class="card h-100"><div class="card-body stat">
+                <div class="stat-icon tint-amber"><i class="bi bi-hourglass-split"></i></div>
+                <div>
+                    <div class="stat-value">@Format.Money(Model.Outstanding)</div><div class="stat-label">Outstanding</div>
+                    @if (Model.CreditOnAccount > 0) { <div class="stat-sub muted">@Format.Money(Model.CreditOnAccount) credit on accounts</div> }
+                </div>
+            </div></div>
+        </a>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <a class="tile-link" asp-controller="Invoices" asp-action="Index" asp-route-overdue="true">
+            <div class="card h-100"><div class="card-body stat">
+                <div class="stat-icon tint-red"><i class="bi bi-exclamation-octagon"></i></div>
+                <div><div class="stat-value">@Format.Money(Model.Overdue)</div><div class="stat-label">Overdue</div><div class="stat-sub muted">@Model.ActiveContracts active contract(s)</div></div>
+            </div></div>
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-transparent d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <div class="fw-semibold">Receivables aging</div>
+            <div class="small muted">What each student owes, by how many days past the due date. As of @Format.Date(today).</div>
+        </div>
+        @if (agingTotal > 0)
+        {
+            <div style="min-width: 260px" title="Share of the outstanding balance by age">
+                <div class="aging-bar">
+                    <span style="width:@Pct(Model.AgingCurrent)%; background:#3b82f6"></span>
+                    <span style="width:@Pct(Model.Aging1To30)%; background:#f59e0b"></span>
+                    <span style="width:@Pct(Model.Aging31To60)%; background:#f97316"></span>
+                    <span style="width:@Pct(Model.Aging61To90)%; background:#ef4444"></span>
+                    <span style="width:@Pct(Model.AgingOver90)%; background:#991b1b"></span>
+                </div>
+            </div>
+        }
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr>
+                <th>Student</th><th class="money">Not yet due</th><th class="money">1–30 days</th><th class="money">31–60 days</th><th class="money">61–90 days</th><th class="money">Over 90 days</th><th class="money">Total</th><th></th>
+            </tr></thead>
+            <tbody>
+            @if (Model.Aging.Count == 0) { <tr><td colspan="8" class="empty">Nobody owes anything right now.</td></tr> }
+            @foreach (var a in Model.Aging)
+            {
+                <tr>
+                    <td><a asp-controller="Invoices" asp-action="Index" asp-route-studentId="@a.StudentId" class="fw-medium">@a.StudentName</a> <span class="small muted">@a.StudentNo</span></td>
+                    <td class="money">@FinanceUi.Money(a.Current, true)</td>
+                    <td class="money">@FinanceUi.Money(a.Days1To30, true)</td>
+                    <td class="money">@FinanceUi.Money(a.Days31To60, true)</td>
+                    <td class="money">@FinanceUi.Money(a.Days61To90, true)</td>
+                    <td class="money">@FinanceUi.Money(a.Over90, true)</td>
+                    <td class="money fw-semibold">@Format.Money(a.Total)</td>
+                    <td class="text-end">
+                        @if (User.HasPermission(Permissions.Billing.ReceivePayments))
+                        {
+                            <a class="btn btn-sm btn-outline-primary" asp-controller="Payments" asp-action="Create" asp-route-studentId="@a.StudentId">Receive</a>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+            @if (Model.Aging.Count > 0)
+            {
+                <tfoot>
+                    <tr class="fw-semibold">
+                        <td>Total</td>
+                        <td class="money">@Format.Money(Model.AgingCurrent)</td>
+                        <td class="money">@Format.Money(Model.Aging1To30)</td>
+                        <td class="money">@Format.Money(Model.Aging31To60)</td>
+                        <td class="money">@Format.Money(Model.Aging61To90)</td>
+                        <td class="money">@Format.Money(Model.AgingOver90)</td>
+                        <td class="money">@Format.Money(Model.Outstanding)</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            }
+        </table>
+    </div>
+</div>
