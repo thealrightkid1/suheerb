@@ -1,0 +1,100 @@
+@using BushiBan.Web.Features.Accounting
+@using BushiBan.Web.Features.Billing
+@model SettingsPage
+@{
+    ViewData["Title"] = "Branch settings";
+    var form = Model.Form;
+    string? Err(string name) => ViewContext.ViewData.ModelState.TryGetValue(name, out var e) && e.Errors.Count > 0 ? e.Errors[0].ErrorMessage : null;
+    var fields = new (string Name, int? Value, string Label, string Help)[]
+    {
+        (nameof(form.ReceivableAccountId), form.ReceivableAccountId, "Student receivables", "Asset. What students owe: invoices add to it, payments take it down."),
+        (nameof(form.TuitionIncomeAccountId), form.TuitionIncomeAccountId, "Tuition income", "Revenue. Monthly tuition."),
+        (nameof(form.AdmissionIncomeAccountId), form.AdmissionIncomeAccountId, "Admission fee income", "Revenue. One-time admission fees on sign-up."),
+        (nameof(form.SecurityDepositAccountId), form.SecurityDepositAccountId, "Security deposits held", "Liability. Refundable deposits are owed back to the student."),
+        (nameof(form.LateFeeIncomeAccountId), form.LateFeeIncomeAccountId, "Late and cancellation fee income", "Revenue. Late fees and early-cancellation fees."),
+        (nameof(form.CashAccountId), form.CashAccountId, "Cash", "Asset. Where cash payments go by default."),
+        (nameof(form.BankAccountId), form.BankAccountId, "Bank", "Asset. Where card, check and bank payments go by default."),
+    };
+    async Task Options(int? selected)
+    {
+        foreach (var g in Model.Accounts.GroupBy(a => a.Group?.Name ?? ""))
+        {
+            <optgroup label="@g.Key">
+                @foreach (var a in g) { <option value="@a.Value" selected="@(a.Value == selected?.ToString())">@a.Text</option> }
+            </optgroup>
+        }
+    }
+}
+@section Head { <link rel="stylesheet" href="@Url.Content(FinanceUi.Stylesheet)" asp-append-version="true" /> }
+
+<div class="row g-3">
+    <div class="col-xl-8">
+        <form method="post" class="card form-card" novalidate>
+            <div class="card-body">
+                <p class="text-body-secondary">Settings for <strong>@Model.BranchName</strong>. Changes apply to new invoices and payments; anything already posted stays as it is.</p>
+                @if (!ViewContext.ViewData.ModelState.IsValid) { <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>Please fix the highlighted fields.</div> }
+                <h2 class="form-section-title">Billing accounts</h2>
+                <div class="row g-3">
+                    @foreach (var f in fields)
+                    {
+                        var err = Err(f.Name);
+                        <div class="col-md-6">
+                            <label class="form-label" for="@f.Name">@f.Label <span class="text-danger">*</span></label>
+                            <select class="form-select @(err is null ? "" : "is-invalid")" id="@f.Name" name="@f.Name" data-search>
+                                <option value="">Choose an account…</option>
+                                @{ await Options(f.Value); }
+                            </select>
+                            @if (err is not null) { <div class="invalid-feedback d-block">@err</div> }
+                            <div class="form-text">@f.Help</div>
+                        </div>
+                    }
+                </div>
+                <h2 class="form-section-title">Late fees</h2>
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <label class="form-label" for="LateFeeAmount">Late fee</label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input class="form-control @(Err("LateFeeAmount") is null ? "" : "is-invalid")" type="number" step="0.01" min="0" id="LateFeeAmount" name="LateFeeAmount"
+                                   value="@form.LateFeeAmount.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" />
+                        </div>
+                        @if (Err("LateFeeAmount") is { } le) { <div class="invalid-feedback d-block">@le</div> }
+                        <div class="form-text">Charged once per unpaid tuition invoice. Set to 0 to turn late fees off.</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label" for="LateFeeGraceDays">Grace period (days)</label>
+                        <input class="form-control @(Err("LateFeeGraceDays") is null ? "" : "is-invalid")" type="number" min="0" max="60" id="LateFeeGraceDays" name="LateFeeGraceDays" value="@form.LateFeeGraceDays" />
+                        @if (Err("LateFeeGraceDays") is { } ge) { <div class="invalid-feedback d-block">@ge</div> }
+                        <div class="form-text">Days after the due date before a late fee can be added.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer bg-transparent">
+                <button class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Save settings</button>
+            </div>
+        </form>
+    </div>
+    <div class="col-xl-4">
+        <div class="card">
+            <div class="card-body">
+                <div class="card-title-sm">Messaging</div>
+                <div class="d-flex align-items-start gap-2 mb-3">
+                    <i class="bi @(Model.EmailConfigured ? "bi-check-circle-fill text-success" : "bi-dash-circle text-body-secondary") fs-5"></i>
+                    <div>
+                        <div class="fw-semibold">Email @(Model.EmailConfigured ? "is set up" : "isn't set up")</div>
+                        <div class="small text-body-secondary">@(Model.EmailConfigured ? $"Sending from {Model.EmailFrom}." : "Emails are recorded in the message history but not sent.")</div>
+                    </div>
+                </div>
+                <div class="d-flex align-items-start gap-2">
+                    <i class="bi @(Model.SmsConfigured ? "bi-check-circle-fill text-success" : "bi-dash-circle text-body-secondary") fs-5"></i>
+                    <div>
+                        <div class="fw-semibold">Text messages @(Model.SmsConfigured ? "are set up" : "aren't set up")</div>
+                        <div class="small text-body-secondary">@(Model.SmsConfigured ? $"Sending through {Model.SmsProvider}." : "Texts are recorded in the message history but not sent.")</div>
+                    </div>
+                </div>
+                <hr />
+                <p class="small text-body-secondary mb-0">The email server and SMS account are set by your IT administrator in the app's server settings (Email and Sms sections), not on this page.</p>
+            </div>
+        </div>
+    </div>
+</div>

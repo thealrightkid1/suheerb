@@ -1,0 +1,130 @@
+@using BushiBan.Web.Features.Accounting
+@using BushiBan.Web.Features.Billing
+@model InvoiceDetailsPage
+@{
+    ViewData["Title"] = $"Invoice {Model.InvoiceNo}";
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Invoices", Url.Action("Index")), (Model.InvoiceNo, null) };
+    var isVoid = Model.Status == InvoiceStatus.Void;
+    var canVoid = !isVoid && Model.Payments.Count == 0 && User.HasPermission(Permissions.Billing.Manage);
+}
+@section Head { <link rel="stylesheet" href="@Url.Content(FinanceUi.Stylesheet)" asp-append-version="true" /> }
+@section Scripts { <script src="@Url.Content(FinanceUi.Script)" asp-append-version="true"></script> }
+@section Actions {
+    @if (Model.Balance > 0 && User.HasPermission(Permissions.Billing.ReceivePayments))
+    {
+        <a class="btn btn-primary" asp-controller="Payments" asp-action="Create" asp-route-studentId="@Model.Student.Id"><i class="bi bi-cash me-1"></i>Receive payment</a>
+    }
+    @if (canVoid)
+    {
+        <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#voidModal"><i class="bi bi-x-circle me-1"></i>Void</button>
+    }
+    <button class="btn btn-outline-secondary" data-print><i class="bi bi-printer me-1"></i>Print</button>
+}
+
+@if (isVoid)
+{
+    <div class="alert alert-secondary no-print"><i class="bi bi-x-circle me-2"></i>This invoice is void and isn't owed. @Model.VoidReason</div>
+}
+else if (Model.Payments.Count > 0 && User.HasPermission(Permissions.Billing.Manage))
+{
+    <div class="alert alert-light border small no-print"><i class="bi bi-info-circle me-2"></i>To void this invoice, first void the payments applied to it.</div>
+}
+
+<div class="card doc">
+    <div class="card-body p-4">
+        <div class="doc-head">
+            <div class="doc-brand">
+                <img src="~/img/logo.svg" alt="" width="48" height="48" />
+                <div class="doc-party">
+                    <div class="school">@Model.Branch.School</div>
+                    <div>@Model.Branch.Branch</div>
+                    @if (Model.Branch.Address is not null) { <div>@Model.Branch.Address</div> }
+                    @if (Model.Branch.CityLine is not null) { <div>@Model.Branch.CityLine</div> }
+                    @if (Model.Branch.Phone is not null || Model.Branch.Email is not null) { <div class="muted">@string.Join(" · ", new[] { Model.Branch.Phone, Model.Branch.Email }.Where(x => x is not null))</div> }
+                </div>
+            </div>
+            <div>
+                <div class="doc-title">Invoice</div>
+                <dl class="doc-meta mt-2 mb-0">
+                    <div><dt>Invoice no.</dt><dd>@Model.InvoiceNo</dd></div>
+                    <div><dt>Date</dt><dd>@Format.Date(Model.IssueDate)</dd></div>
+                    <div><dt>Due</dt><dd class="@(Model.IsOverdue ? "text-danger" : "")">@Format.Date(Model.DueDate)</dd></div>
+                    <div class="mt-1">@FinanceUi.Badge(Model.Status, Model.IsOverdue)</div>
+                </dl>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-sm-6 doc-party">
+                <div class="label">Bill to</div>
+                <div class="fw-semibold">@Model.Student.Name</div>
+                <div class="muted small">Student no. @Model.Student.StudentNo</div>
+                @if (Model.Student.Address is not null) { <div>@Model.Student.Address</div> }
+                @if (Model.Student.CityLine is not null) { <div>@Model.Student.CityLine</div> }
+                @if (Model.Student.Email is not null) { <div>@Model.Student.Email</div> }
+            </div>
+            <div class="col-sm-6 doc-party text-sm-end mt-3 mt-sm-0">
+                <div class="label">For</div>
+                <div>@Model.Description</div>
+                @if (Model.ContractId is not null)
+                {
+                    <div class="small"><a asp-controller="Contracts" asp-action="Details" asp-route-id="@Model.ContractId">@Model.ContractProgram contract</a></div>
+                }
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table mb-0">
+                <thead><tr><th>Item</th><th class="money">Amount</th></tr></thead>
+                <tbody>
+                @foreach (var l in Model.Lines)
+                {
+                    <tr><td>@l.Description</td><td class="money">@Format.Money(l.Amount)</td></tr>
+                }
+                </tbody>
+                <tfoot>
+                    <tr class="doc-total"><td class="text-end">Total</td><td class="money">@Format.Money(Model.Total)</td></tr>
+                    @foreach (var p in Model.Payments)
+                    {
+                        <tr class="small">
+                            <td class="text-end">Paid @Format.Date(p.Date) · @p.Method.DisplayName() · <a asp-controller="Payments" asp-action="Details" asp-route-id="@p.PaymentId">@p.ReceiptNo</a></td>
+                            <td class="money">−@Format.Money(p.Amount)</td>
+                        </tr>
+                    }
+                    <tr class="doc-total"><td class="text-end">Balance due</td><td class="money">@Format.Money(Model.Balance)</td></tr>
+                </tfoot>
+            </table>
+        </div>
+
+        @if (isVoid) { <div class="mt-3"><span class="doc-stamp void">Void</span></div> }
+        else if (Model.Status == InvoiceStatus.Paid) { <div class="mt-3"><span class="doc-stamp paid">Paid</span></div> }
+
+        <div class="doc-foot">
+            Please quote invoice @Model.InvoiceNo with your payment. Thank you for training with us!
+            @if (Model.VoucherId is not null && User.HasPermission(Permissions.Vouchers.View))
+            {
+                <div class="no-print mt-2">Posted to the books as voucher <a asp-controller="Vouchers" asp-action="Details" asp-route-id="@Model.VoucherId">@Model.VoucherNo</a>.</div>
+            }
+        </div>
+    </div>
+</div>
+
+@if (canVoid)
+{
+    <div class="modal fade" id="voidModal" tabindex="-1" aria-labelledby="voidTitle" aria-hidden="true">
+        <div class="modal-dialog">
+            <form method="post" asp-action="Void" asp-route-id="@Model.Id" class="modal-content">
+                <div class="modal-header"><h2 class="modal-title fs-5" id="voidTitle">Void @Model.InvoiceNo</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <p class="text-body-secondary">The student will no longer owe @Format.Money(Model.Total) for this invoice, and its voucher will be reversed. This can't be undone.</p>
+                    <label class="form-label" for="voidReason">Reason <span class="text-danger">*</span></label>
+                    <input class="form-control" id="voidReason" name="reason" maxlength="200" required placeholder="e.g. Charged twice" />
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Keep invoice</button>
+                    <button class="btn btn-danger">Void invoice</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}

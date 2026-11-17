@@ -1,0 +1,78 @@
+@using BushiBan.Web.Features.Accounting
+@model VoucherIndexPage
+@{
+    ViewData["Title"] = "Vouchers";
+    var f = Model.Filter;
+    var filtered = f.From != null || f.To != null || f.Type != null || f.Status != null || f.AccountId != null || !string.IsNullOrWhiteSpace(f.Q);
+}
+@section Head { <link rel="stylesheet" href="@Url.Content(FinanceUi.Stylesheet)" asp-append-version="true" /> }
+@section Actions {
+    @if (User.HasPermission(Permissions.Vouchers.Create))
+    {
+        <a class="btn btn-primary" asp-action="Create"><i class="bi bi-plus-lg me-1"></i>New voucher</a>
+    }
+}
+<div class="card">
+    <div class="card-header bg-transparent">
+        <form method="get" class="row g-2 align-items-end filter-bar">
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" for="Q">Search</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input class="form-control" id="Q" name="Q" value="@f.Q" placeholder="Voucher no or description" />
+                </div>
+            </div>
+            <div class="col-6 col-sm-3 col-lg-2">
+                <label class="form-label" for="From">From</label>
+                <input class="form-control" type="date" id="From" name="From" value="@FinanceUi.Iso(f.From)" />
+            </div>
+            <div class="col-6 col-sm-3 col-lg-2">
+                <label class="form-label" for="To">To</label>
+                <input class="form-control" type="date" id="To" name="To" value="@FinanceUi.Iso(f.To)" />
+            </div>
+            <div class="col-6 col-sm-4 col-lg-1">
+                <label class="form-label" for="Type">Type</label>
+                <select class="form-select" id="Type" name="Type" asp-items="EnumHelpers.SelectList(f.Type)"><option value="">All</option></select>
+            </div>
+            <div class="col-6 col-sm-4 col-lg-1">
+                <label class="form-label" for="Status">Status</label>
+                <select class="form-select" id="Status" name="Status" asp-items="EnumHelpers.SelectList(f.Status)"><option value="">All</option></select>
+            </div>
+            <div class="col-sm-4 col-lg-2">
+                <label class="form-label" for="AccountId">Account</label>
+                <select class="form-select" id="AccountId" name="AccountId" data-search asp-items="Model.Accounts"><option value="">Any account</option></select>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filter</button>
+                @if (filtered) { <a class="btn btn-link" asp-action="Index">Clear</a> }
+            </div>
+        </form>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Date</th><th>Voucher no</th><th>Type</th><th>Description</th><th class="money">Amount</th><th>Status</th><th>Source</th></tr></thead>
+            <tbody>
+            @if (Model.Rows.Items.Count == 0)
+            {
+                <tr><td colspan="7" class="empty">@(filtered ? "No vouchers match these filters." : "No vouchers yet. Billing posts invoices and payments here automatically, or add one with New voucher.")</td></tr>
+            }
+            @foreach (var v in Model.Rows.Items)
+            {
+                <tr>
+                    <td class="nowrap">@Format.Date(v.Date)</td>
+                    <td class="nowrap"><a asp-action="Details" asp-route-id="@v.Id" class="fw-medium">@v.VoucherNo</a></td>
+                    <td class="nowrap">@v.Type.DisplayName()</td>
+                    <td>@if (v.IsReversal) { <i class="bi bi-arrow-counterclockwise text-body-secondary me-1" title="Reversal"></i> }@v.Description</td>
+                    <td class="money">@Format.Money(v.Amount)</td>
+                    <td>@FinanceUi.Badge(v.Status)</td>
+                    <td class="nowrap small">
+                        @if (v.SourceReference is not null) { <a asp-action="Source" asp-route-id="@v.Id">@v.SourceReference</a> }
+                        else { <span class="muted">Manual</span> }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+<partial name="_Pager" model="(Model.Rows.Page, Model.Rows.Pages, Model.Rows.Total)" />

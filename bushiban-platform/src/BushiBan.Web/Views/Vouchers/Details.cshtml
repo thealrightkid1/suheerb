@@ -1,0 +1,127 @@
+@using BushiBan.Web.Features.Accounting
+@inject BushiBan.Web.Services.BranchClock Clock
+@model VoucherDetailsPage
+@{
+    ViewData["Title"] = $"Voucher {Model.VoucherNo}";
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Vouchers", Url.Action("Index")), (Model.VoucherNo, null) };
+    var isDraft = Model.Status == VoucherStatus.Draft;
+    var canReverse = Model.Status == VoucherStatus.Posted && Model.ReversalOfId is null && !Model.IsFromBilling && User.HasPermission(Permissions.Vouchers.Delete);
+}
+@section Head { <link rel="stylesheet" href="@Url.Content(FinanceUi.Stylesheet)" asp-append-version="true" /> }
+@section Scripts { <script src="@Url.Content(FinanceUi.Script)" asp-append-version="true"></script> }
+@section Actions {
+    @if (isDraft && User.HasPermission(Permissions.Vouchers.Edit))
+    {
+        <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@Model.Id"><i class="bi bi-pencil me-1"></i>Edit draft</a>
+    }
+    @if (isDraft && User.HasPermission(Permissions.Vouchers.Create))
+    {
+        <form method="post" asp-action="Post" asp-route-id="@Model.Id" data-confirm="Post @Model.VoucherNo? Posted vouchers can't be edited, only reversed.">
+            <button class="btn btn-primary"><i class="bi bi-check2-circle me-1"></i>Post</button>
+        </form>
+    }
+    @if (isDraft && User.HasPermission(Permissions.Vouchers.Edit))
+    {
+        <form method="post" asp-action="Delete" asp-route-id="@Model.Id" data-confirm="Delete draft @Model.VoucherNo?">
+            <button class="btn btn-outline-danger"><i class="bi bi-trash me-1"></i>Delete draft</button>
+        </form>
+    }
+    @if (canReverse)
+    {
+        <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#reverseModal"><i class="bi bi-arrow-counterclockwise me-1"></i>Reverse</button>
+    }
+    <button class="btn btn-outline-secondary" data-print><i class="bi bi-printer me-1"></i>Print</button>
+}
+
+@if (isDraft)
+{
+    <div class="alert alert-info no-print"><i class="bi bi-info-circle me-2"></i>This is a draft. It isn't in any report until it's posted.</div>
+}
+@if (Model.ReversedById is not null)
+{
+    <div class="alert alert-secondary no-print"><i class="bi bi-arrow-counterclockwise me-2"></i>Reversed by <a asp-action="Details" asp-route-id="@Model.ReversedById">@Model.ReversedByNo</a>. Together they cancel out.</div>
+}
+@if (Model.IsFromBilling && Model.Status == VoucherStatus.Posted && Model.ReversalOfId is null)
+{
+    <div class="alert alert-light border no-print"><i class="bi bi-link-45deg me-2"></i>Created by billing.
+        @if (Model.SourceUrl is not null) { <text>To correct it, void </text><a href="@Model.SourceUrl">@Model.SourceReference</a><text> instead of reversing it here.</text> }
+    </div>
+}
+
+<div class="card doc">
+    <div class="card-body p-4">
+        <div class="doc-head">
+            <div class="doc-brand">
+                <img src="~/img/logo.svg" alt="" width="44" height="44" />
+                <div><div class="school">Bushi Ban International</div><div class="muted">@Model.BranchName</div></div>
+            </div>
+            <div>
+                <div class="doc-title">@Model.Type.DisplayName() voucher</div>
+                <dl class="doc-meta mt-2 mb-0">
+                    <div><dt>No.</dt><dd>@Model.VoucherNo</dd></div>
+                    <div><dt>Date</dt><dd>@Format.Date(Model.Date)</dd></div>
+                    <div><dt>Status</dt><dd>@FinanceUi.Badge(Model.Status)</dd></div>
+                    @if (Model.FiscalYear is not null) { <div><dt>Fiscal year</dt><dd>@Model.FiscalYear</dd></div> }
+                </dl>
+            </div>
+        </div>
+        <p class="mb-3"><span class="muted">Description:</span> @Model.Description</p>
+        @if (Model.ReversalOfId is not null)
+        {
+            <p class="mb-3"><span class="muted">Reverses:</span> <a asp-action="Details" asp-route-id="@Model.ReversalOfId">@Model.ReversalOfNo</a></p>
+        }
+        @if (Model.SourceReference is not null)
+        {
+            <p class="mb-3"><span class="muted">Source:</span> @if (Model.SourceUrl is not null) { <a href="@Model.SourceUrl">@Model.SourceReference</a> } else { @Model.SourceReference }</p>
+        }
+        <div class="table-responsive">
+            <table class="table mb-0">
+                <thead><tr><th>Account</th><th>Narration</th><th class="money">Debit</th><th class="money">Credit</th></tr></thead>
+                <tbody>
+                @foreach (var l in Model.Lines)
+                {
+                    <tr>
+                        <td><span class="muted me-1">@l.AccountCode</span> @l.AccountName</td>
+                        <td>@l.Narration</td>
+                        <td class="money">@FinanceUi.Money(l.Debit, blankZero: true)</td>
+                        <td class="money">@FinanceUi.Money(l.Credit, blankZero: true)</td>
+                    </tr>
+                }
+                </tbody>
+                <tfoot>
+                    <tr class="doc-total"><td colspan="2" class="text-end">Total</td><td class="money">@Format.Money(Model.TotalDebit)</td><td class="money">@Format.Money(Model.TotalCredit)</td></tr>
+                </tfoot>
+            </table>
+        </div>
+        <div class="doc-foot d-flex justify-content-between flex-wrap gap-2">
+            <span>Created by @(Model.CreatedBy ?? "system") on @Format.DateTime(Clock.ToLocal(Model.CreatedAt))</span>
+            <span class="print-only">Printed @Format.DateTime(Clock.Now)</span>
+        </div>
+    </div>
+</div>
+
+@if (canReverse)
+{
+    <div class="modal fade" id="reverseModal" tabindex="-1" aria-labelledby="reverseTitle" aria-hidden="true">
+        <div class="modal-dialog">
+            <form method="post" asp-action="Reverse" asp-route-id="@Model.Id" class="modal-content">
+                <div class="modal-header"><h2 class="modal-title fs-5" id="reverseTitle">Reverse @Model.VoucherNo</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <p class="text-body-secondary">A new voucher with the debits and credits swapped will be posted, cancelling this one out. This can't be undone.</p>
+                    <div class="mb-3">
+                        <label class="form-label" for="reverseDate">Reversal date</label>
+                        <input class="form-control" type="date" id="reverseDate" name="date" value="@FinanceUi.Iso(Clock.Today)" required />
+                    </div>
+                    <div>
+                        <label class="form-label" for="reason">Reason <span class="text-danger">*</span></label>
+                        <input class="form-control" id="reason" name="reason" maxlength="200" required placeholder="e.g. Posted to the wrong account" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-danger">Reverse voucher</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}

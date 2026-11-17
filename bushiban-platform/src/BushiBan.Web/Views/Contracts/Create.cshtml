@@ -1,0 +1,120 @@
+@using BushiBan.Web.Features.Accounting
+@using BushiBan.Web.Features.Billing
+@model ContractFormPage
+@{
+    ViewData["Title"] = "New contract";
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Contracts", Url.Action("Index")), ("New", null) };
+    var form = Model.Form;
+    string? Err(string name) => ViewContext.ViewData.ModelState.TryGetValue(name, out var e) && e.Errors.Count > 0 ? e.Errors[0].ErrorMessage : null;
+    var top = Err("");
+    string M(decimal v) => v.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+    var programsJson = System.Text.Json.JsonSerializer.Serialize(Model.Programs, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+}
+@section Head { <link rel="stylesheet" href="@Url.Content(FinanceUi.Stylesheet)" asp-append-version="true" /> }
+@section Scripts { <script src="@Url.Content(FinanceUi.Script)" asp-append-version="true"></script> }
+
+<div class="row g-3">
+    <div class="col-xl-8">
+        <form method="post" asp-action="Create" class="card form-card" novalidate data-contract-form data-programs="@programsJson" data-today="@FinanceUi.Iso(Model.Today)">
+            <div class="card-body">
+                @if (top is not null) { <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>@top</div> }
+                <h2 class="form-section-title">Student and program</h2>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="StudentId">Student <span class="text-danger">*</span></label>
+                        <select class="form-select @(Err("StudentId") is null ? "" : "is-invalid")" id="StudentId" name="StudentId" data-search data-reload="studentId" asp-items="Model.Students">
+                            <option value="">Pick a student…</option>
+                        </select>
+                        @if (Err("StudentId") is { } se) { <div class="invalid-feedback d-block">@se</div> }
+                        <div class="form-text">Picking a student fills in their program and discount.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="CourseId">Program <span class="text-danger">*</span></label>
+                        <select class="form-select @(Err("CourseId") is null ? "" : "is-invalid")" id="CourseId" name="CourseId">
+                            <option value="">Pick a program…</option>
+                            @foreach (var p in Model.Programs) { <option value="@p.Id" selected="@(p.Id == form.CourseId)">@p.Name</option> }
+                        </select>
+                        @if (Err("CourseId") is { } ce) { <div class="invalid-feedback d-block">@ce</div> }
+                        <div class="form-text">Prices come from the program's fee structure and can be changed for this student.</div>
+                    </div>
+                </div>
+
+                <h2 class="form-section-title">Price</h2>
+                <div class="row g-3">
+                    <div class="col-sm-6 col-md-3">
+                        <label class="form-label" for="AdmissionFee">Admission fee</label>
+                        <div class="input-group"><span class="input-group-text">$</span><input class="form-control" type="number" step="0.01" min="0" id="AdmissionFee" name="AdmissionFee" value="@M(form.AdmissionFee)" /></div>
+                    </div>
+                    <div class="col-sm-6 col-md-3">
+                        <label class="form-label" for="SecurityFee">Security deposit</label>
+                        <div class="input-group"><span class="input-group-text">$</span><input class="form-control" type="number" step="0.01" min="0" id="SecurityFee" name="SecurityFee" value="@M(form.SecurityFee)" /></div>
+                        <div class="form-text">Refundable. Held as a liability.</div>
+                    </div>
+                    <div class="col-sm-6 col-md-3">
+                        <label class="form-label" for="MonthlyFee">Monthly tuition</label>
+                        <div class="input-group"><span class="input-group-text">$</span><input class="form-control" type="number" step="0.01" min="0" id="MonthlyFee" name="MonthlyFee" value="@M(form.MonthlyFee)" /></div>
+                    </div>
+                    <div class="col-sm-6 col-md-3">
+                        <label class="form-label" for="MonthlyDiscount">Monthly discount</label>
+                        <div class="input-group"><span class="input-group-text">$</span><input class="form-control" type="number" step="0.01" min="0" id="MonthlyDiscount" name="MonthlyDiscount" value="@M(form.MonthlyDiscount)" /></div>
+                    </div>
+                </div>
+
+                <h2 class="form-section-title">Term and billing</h2>
+                <div class="row g-3">
+                    <div class="col-sm-6 col-md-3">
+                        <label class="form-label" for="StartDate">Start date <span class="text-danger">*</span></label>
+                        <input class="form-control" type="date" id="StartDate" name="StartDate" value="@FinanceUi.Iso(form.StartDate)" required />
+                    </div>
+                    <div class="col-sm-6 col-md-3">
+                        <label class="form-label" for="TermMonths">Term (months) <span class="text-danger">*</span></label>
+                        <input class="form-control" type="number" min="1" max="120" id="TermMonths" name="TermMonths" value="@form.TermMonths" required />
+                    </div>
+                    <div class="col-sm-6 col-md-3">
+                        <label class="form-label" for="BillingDay">Tuition due on day</label>
+                        <input class="form-control" type="number" min="1" max="28" id="BillingDay" name="BillingDay" value="@form.BillingDay" />
+                        <div class="form-text">1 to 28 of each month.</div>
+                    </div>
+                    <div class="col-sm-6 col-md-3">
+                        <label class="form-label" for="PreferredMethod">Pays by</label>
+                        <select class="form-select" id="PreferredMethod" name="PreferredMethod" asp-items="EnumHelpers.SelectList<PaymentMethod>(form.PreferredMethod)"></select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="Notes">Notes</label>
+                        <textarea class="form-control" id="Notes" name="Notes" rows="2" maxlength="500">@form.Notes</textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer bg-transparent">
+                <div class="d-flex flex-wrap gap-4 mb-3 small">
+                    <div><div class="muted">Monthly after discount</div><div class="fs-5 fw-bold" data-preview="net">–</div></div>
+                    <div><div class="muted">Ends on</div><div class="fs-5 fw-bold" data-preview="end">–</div></div>
+                    <div><div class="muted">Tuition over the term</div><div class="fs-5 fw-bold" data-preview="total">–</div></div>
+                    <div><div class="muted">Sign-up invoice today</div><div class="fs-5 fw-bold" data-preview="signup">–</div></div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Create contract and invoice</button>
+                    <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+                </div>
+            </div>
+        </form>
+    </div>
+    <div class="col-xl-4">
+        @if (Model.Account is not null)
+        {
+            <partial name="~/Views/Billing/_StudentAccount.cshtml" model="Model.Account" />
+        }
+        else
+        {
+            <div class="card"><div class="card-body small text-body-secondary">
+                <p class="fw-semibold text-body mb-2">What happens when you save</p>
+                <ul class="mb-0 ps-3">
+                    <li>A sign-up invoice is issued today for the admission fee and security deposit.</li>
+                    <li>If the start month has arrived, the first month's tuition is on it too.</li>
+                    <li>Later months are billed by <strong>Run monthly billing</strong> on the Billing page, on the day you pick.</li>
+                    <li>Everything is posted to the books automatically.</li>
+                </ul>
+            </div></div>
+        }
+    </div>
+</div>

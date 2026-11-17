@@ -1,0 +1,65 @@
+@using BushiBan.Web.Features.Accounting
+@using BushiBan.Web.Features.Billing
+@model ContractIndexPage
+@{
+    ViewData["Title"] = "Contracts";
+    var f = Model.Filter;
+    var filtered = f.Status != null || f.CourseId != null || f.StudentId != null || !string.IsNullOrWhiteSpace(f.Q);
+}
+@section Head { <link rel="stylesheet" href="@Url.Content(FinanceUi.Stylesheet)" asp-append-version="true" /> }
+@section Actions {
+    @if (User.HasPermission(Permissions.Billing.Manage))
+    {
+        <a class="btn btn-primary" asp-action="Create"><i class="bi bi-plus-lg me-1"></i>New contract</a>
+    }
+}
+<div class="card">
+    <div class="card-header bg-transparent">
+        <form method="get" class="row g-2 align-items-end filter-bar" data-autosubmit>
+            <div class="col-sm-6 col-lg-4">
+                <label class="form-label" for="Q">Search</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input class="form-control" id="Q" name="Q" value="@f.Q" placeholder="Student name or number" />
+                </div>
+            </div>
+            <div class="col-6 col-sm-3 col-lg-2">
+                <label class="form-label" for="Status">Status</label>
+                <select class="form-select" id="Status" name="Status" asp-items="EnumHelpers.SelectList(f.Status)"><option value="">All</option></select>
+            </div>
+            <div class="col-6 col-sm-3 col-lg-3">
+                <label class="form-label" for="CourseId">Program</label>
+                <select class="form-select" id="CourseId" name="CourseId" asp-items="Model.Programs"><option value="">All programs</option></select>
+            </div>
+            @if (f.StudentId is not null) { <input type="hidden" name="StudentId" value="@f.StudentId" /> }
+            <div class="col-auto">
+                <button class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filter</button>
+                @if (filtered) { <a class="btn btn-link" asp-action="Index">Clear</a> }
+            </div>
+        </form>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Student</th><th>Program</th><th>Start</th><th>End</th><th class="money">Monthly</th><th>Billed through</th><th>Status</th></tr></thead>
+            <tbody>
+            @if (Model.Rows.Items.Count == 0)
+            {
+                <tr><td colspan="7" class="empty">@(filtered ? "No contracts match these filters." : "No contracts yet. Create one when a student signs up.")</td></tr>
+            }
+            @foreach (var c in Model.Rows.Items)
+            {
+                <tr>
+                    <td><a asp-action="Details" asp-route-id="@c.Id" class="fw-medium">@c.StudentName</a> <span class="small muted">@c.StudentNo</span></td>
+                    <td>@c.Program</td>
+                    <td class="nowrap">@Format.Date(c.StartDate)</td>
+                    <td class="nowrap">@Format.Date(c.EndDate) <span class="small muted">(@c.TermMonths mo)</span></td>
+                    <td class="money">@Format.Money(c.NetMonthly)@if (c.MonthlyDiscount > 0) { <div class="small muted">after @Format.Money(c.MonthlyDiscount) discount</div> }</td>
+                    <td class="nowrap">@(c.BilledThrough is { } b ? b.ToString("MMM yyyy", System.Globalization.CultureInfo.GetCultureInfo("en-US")) : "Not yet")</td>
+                    <td>@FinanceUi.Badge(c.Status)</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+<partial name="_Pager" model="(Model.Rows.Page, Model.Rows.Pages, Model.Rows.Total)" />

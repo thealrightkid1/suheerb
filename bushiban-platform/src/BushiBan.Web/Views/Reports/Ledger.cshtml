@@ -1,0 +1,64 @@
+@using BushiBan.Web.Features.Accounting
+@model ReportPage<LedgerReport>
+@{
+    ViewData["Title"] = "Account ledger";
+    var r = Model.Report;
+    var f = Model.Filter;
+    var period = $"{Format.Date(f.From)} to {Format.Date(f.To)}";
+    var error = ViewContext.ViewData.ModelState.TryGetValue("", out var e) && e.Errors.Count > 0 ? e.Errors[0].ErrorMessage : null;
+}
+@section Head { <link rel="stylesheet" href="@Url.Content(FinanceUi.Stylesheet)" asp-append-version="true" /> }
+@section Scripts { <script src="@Url.Content(FinanceUi.Script)" asp-append-version="true"></script> }
+@section Actions { @if (r is not null) { <partial name="_ReportActions" /> } }
+@if (r is not null)
+{
+    <partial name="_PrintHeader" model='($"Ledger: {r.Account.Code} {r.Account.Name}", Model.Scope, period)' />
+}
+
+<div class="card">
+    <div class="card-header bg-transparent">
+        <form method="get" class="row g-2 align-items-end filter-bar">
+            <div class="col-md-6 col-lg-4">
+                <label class="form-label" for="Code">Account</label>
+                <select class="form-select" id="Code" name="Code" data-search asp-items="Model.Accounts"><option value="">Pick an account…</option></select>
+            </div>
+            <partial name="_PeriodFilter" model="(f, Model.CanConsolidate, false)" />
+            <div class="col-auto"><button class="btn btn-outline-secondary"><i class="bi bi-arrow-repeat me-1"></i>Show ledger</button></div>
+        </form>
+        @if (r is not null)
+        {
+            <div class="small muted mt-2 no-print" data-scope="@Model.Scope">@Model.Scope · @r.Account.MainName › @r.Account.SubName · normal balance is @(r.Account.IsDebitNature ? "debit" : "credit")</div>
+        }
+    </div>
+    @if (error is not null) { <div class="alert alert-danger m-3">@error</div> }
+    @if (r is null)
+    {
+        <div class="card-body empty text-center text-body-secondary py-5">Pick an account to see every posting to it, with a running balance.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 report-table">
+                <thead><tr><th>Date</th><th>Voucher no</th><th>Description</th><th class="money">Debit</th><th class="money">Credit</th><th class="money">Balance</th></tr></thead>
+                <tbody>
+                    <tr class="group-row"><td>@Format.Date(r.From)</td><td></td><td>Opening balance</td><td></td><td></td><td class="money">@FinanceUi.Money(r.Opening)</td></tr>
+                    @if (r.Lines.Count == 0) { <tr><td colspan="6" class="empty">No postings to this account in this period.</td></tr> }
+                    @foreach (var l in r.Lines)
+                    {
+                        <tr>
+                            <td class="nowrap">@Format.Date(l.Date)</td>
+                            <td class="nowrap"><a asp-controller="Vouchers" asp-action="Details" asp-route-id="@l.VoucherId">@l.VoucherNo</a></td>
+                            <td>@l.Description @if (!string.IsNullOrWhiteSpace(l.Narration) && l.Narration != l.Description) { <div class="small muted">@l.Narration</div> }</td>
+                            <td class="money">@FinanceUi.Money(l.Debit, blankZero: true)</td>
+                            <td class="money">@FinanceUi.Money(l.Credit, blankZero: true)</td>
+                            <td class="money">@FinanceUi.Money(l.Balance)</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr class="total"><td colspan="3" class="text-end">Closing balance @Format.Date(r.To)</td><td class="money">@Format.Money(r.TotalDebit)</td><td class="money">@Format.Money(r.TotalCredit)</td><td class="money">@FinanceUi.Money(r.Closing)</td></tr>
+                </tfoot>
+            </table>
+        </div>
+    }
+</div>

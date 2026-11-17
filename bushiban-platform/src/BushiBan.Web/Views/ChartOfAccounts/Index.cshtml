@@ -1,0 +1,67 @@
+@using BushiBan.Web.Features.Accounting
+@model ChartOfAccountsPage
+@{
+    ViewData["Title"] = "Chart of accounts";
+    var canLedger = User.HasPermission(Permissions.Finance.Reports);
+}
+@section Head { <link rel="stylesheet" href="@Url.Content(FinanceUi.Stylesheet)" asp-append-version="true" /> }
+@section Scripts { <script src="@Url.Content(FinanceUi.Script)" asp-append-version="true"></script> }
+@section Actions {
+    <button class="btn btn-outline-secondary" data-tree-all="open"><i class="bi bi-arrows-expand me-1"></i>Expand all</button>
+    <button class="btn btn-outline-secondary" data-tree-all="closed"><i class="bi bi-arrows-collapse me-1"></i>Collapse all</button>
+    <button class="btn btn-outline-secondary" data-print><i class="bi bi-printer me-1"></i>Print</button>
+}
+<p class="text-body-secondary">Balances include every posted voucher up to today (@Format.Date(Model.AsOf)). Assets and expenses show debit balances; liabilities, equity and revenue show credit balances.@if (canLedger) { <text> Click an account to open its ledger.</text> }</p>
+
+<div class="row g-3 mb-3">
+    @foreach (var (type, total) in Model.TypeTotals)
+    {
+        <div class="col-6 col-md-4 col-xl">
+            <div class="card h-100"><div class="card-body py-3">
+                <div class="stat-label">@type</div>
+                <div class="fs-5 fw-bold money text-start">@FinanceUi.Money(total)</div>
+            </div></div>
+        </div>
+    }
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" data-tree>
+            <thead><tr><th>Code</th><th>Account</th><th>Type</th><th class="money">Balance</th></tr></thead>
+            <tbody>
+            @if (Model.Mains.Count == 0) { <tr><td colspan="4" class="empty">No accounts yet. Start with Main accounts.</td></tr> }
+            @foreach (var m in Model.Mains)
+            {
+                <tr class="tree-row tree-main @(m.IsActive ? "" : "tree-inactive")">
+                    <td><button type="button" class="tree-toggle" aria-expanded="true" data-target="m@(m.Id)" aria-label="Show or hide @m.Name"><i class="bi bi-chevron-down"></i></button>@m.Code</td>
+                    <td>@m.Name</td>
+                    <td>@m.Type</td>
+                    <td class="money">@FinanceUi.Money(m.Balance)</td>
+                </tr>
+                @foreach (var s in m.Subs)
+                {
+                    <tr class="tree-row tree-sub @(s.IsActive ? "" : "tree-inactive")" data-parent="m@(m.Id)">
+                        <td><button type="button" class="tree-toggle" aria-expanded="true" data-target="s@(s.Id)" aria-label="Show or hide @s.Name"><i class="bi bi-chevron-down"></i></button>@s.Code</td>
+                        <td>@s.Name</td>
+                        <td></td>
+                        <td class="money">@FinanceUi.Money(s.Balance)</td>
+                    </tr>
+                    @foreach (var d in s.Details)
+                    {
+                        <tr class="tree-row tree-detail @(d.IsActive ? "" : "tree-inactive")" data-parent="m@(m.Id) s@(s.Id)">
+                            <td>@d.Code</td>
+                            <td>
+                                @if (canLedger) { <a asp-controller="Reports" asp-action="Ledger" asp-route-code="@d.Code">@d.Name</a> } else { @d.Name }
+                                @if (!d.IsActive) { <span class="badge text-bg-light ms-1">Inactive</span> }
+                            </td>
+                            <td></td>
+                            <td class="money">@FinanceUi.Money(d.Balance, blankZero: true)</td>
+                        </tr>
+                    }
+                }
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

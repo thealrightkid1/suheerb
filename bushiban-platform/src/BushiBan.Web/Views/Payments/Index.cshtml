@@ -1,0 +1,80 @@
+@using BushiBan.Web.Features.Accounting
+@using BushiBan.Web.Features.Billing
+@model PaymentIndexPage
+@{
+    ViewData["Title"] = "Payments";
+    var f = Model.Filter;
+    var filtered = f.From != null || f.To != null || f.Method != null || f.StudentId != null || f.ShowVoided || !string.IsNullOrWhiteSpace(f.Q);
+}
+@section Head { <link rel="stylesheet" href="@Url.Content(FinanceUi.Stylesheet)" asp-append-version="true" /> }
+@section Actions {
+    @if (User.HasPermission(Permissions.Billing.ReceivePayments))
+    {
+        <a class="btn btn-primary" asp-action="Create" asp-route-studentId="@f.StudentId"><i class="bi bi-cash me-1"></i>Receive payment</a>
+    }
+}
+<div class="card">
+    <div class="card-header bg-transparent">
+        <form method="get" class="row g-2 align-items-end filter-bar">
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" for="Q">Search</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input class="form-control" id="Q" name="Q" value="@f.Q" placeholder="Receipt no, student or reference" />
+                </div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" for="StudentId">Student</label>
+                <select class="form-select" id="StudentId" name="StudentId" data-search asp-items="Model.Students"><option value="">All students</option></select>
+            </div>
+            <div class="col-6 col-sm-3 col-lg-2">
+                <label class="form-label" for="From">From</label>
+                <input class="form-control" type="date" id="From" name="From" value="@FinanceUi.Iso(f.From)" />
+            </div>
+            <div class="col-6 col-sm-3 col-lg-2">
+                <label class="form-label" for="To">To</label>
+                <input class="form-control" type="date" id="To" name="To" value="@FinanceUi.Iso(f.To)" />
+            </div>
+            <div class="col-6 col-sm-3 col-lg-2">
+                <label class="form-label" for="Method">Method</label>
+                <select class="form-select" id="Method" name="Method" asp-items="EnumHelpers.SelectList(f.Method)"><option value="">All</option></select>
+            </div>
+            <div class="col-auto pb-2">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="ShowVoided" name="ShowVoided" value="true" @(f.ShowVoided ? "checked" : "") />
+                    <label class="form-check-label" for="ShowVoided">Include voided</label>
+                </div>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filter</button>
+                @if (filtered) { <a class="btn btn-link" asp-action="Index">Clear</a> }
+            </div>
+        </form>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Receipt</th><th>Date</th><th>Student</th><th>Method</th><th class="money">Amount</th><th class="money">Applied</th><th class="money">Credit left</th><th>Status</th></tr></thead>
+            <tbody>
+            @if (Model.Rows.Items.Count == 0)
+            {
+                <tr><td colspan="8" class="empty">@(filtered ? "No payments match these filters." : "No payments yet.")</td></tr>
+            }
+            @foreach (var p in Model.Rows.Items)
+            {
+                <tr class="@(p.IsVoided ? "text-body-secondary" : "")">
+                    <td class="nowrap"><a asp-action="Details" asp-route-id="@p.Id" class="fw-medium">@p.ReceiptNo</a></td>
+                    <td class="nowrap">@Format.Date(p.Date)</td>
+                    <td><a asp-action="Index" asp-route-studentId="@p.StudentId">@p.StudentName</a></td>
+                    <td>@p.Method.DisplayName() @if (!string.IsNullOrWhiteSpace(p.Reference)) { <span class="small muted">@p.Reference</span> }</td>
+                    <td class="money">@if (p.IsVoided) { <s>@Format.Money(p.Amount)</s> } else { @Format.Money(p.Amount) }</td>
+                    <td class="money">@FinanceUi.Money(p.Applied, true)</td>
+                    <td class="money">@FinanceUi.Money(p.Unapplied, true)</td>
+                    <td>@(p.IsVoided ? FinanceUi.Badge("st-void", "Void") : FinanceUi.Badge("st-paid", "Received"))</td>
+                </tr>
+            }
+            </tbody>
+            <tfoot><tr><td colspan="4" class="text-end fw-semibold">Total received (excluding voided)</td><td class="money fw-bold">@Format.Money(Model.FilteredTotal)</td><td colspan="3"></td></tr></tfoot>
+        </table>
+    </div>
+</div>
+<partial name="_Pager" model="(Model.Rows.Page, Model.Rows.Pages, Model.Rows.Total)" />

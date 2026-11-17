@@ -1,0 +1,94 @@
+@using BushiBan.Web.Features.Accounting
+@model VoucherFormPage
+@{
+    var form = Model.Form;
+    var isNew = form.Id is null;
+    ViewData["Title"] = isNew ? "New voucher" : $"Edit draft {form.VoucherNo}";
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Vouchers", Url.Action("Index")), (isNew ? "New" : form.VoucherNo ?? "Edit", null) };
+    var errors = ViewContext.ViewData.ModelState.Where(kv => kv.Value!.Errors.Count > 0).SelectMany(kv => kv.Value!.Errors.Select(e => e.ErrorMessage)).Distinct().ToList();
+    string Amount(decimal? v) => v is null or 0 ? "" : v.Value.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+}
+@section Head { <link rel="stylesheet" href="@Url.Content(FinanceUi.Stylesheet)" asp-append-version="true" /> }
+@section Scripts { <script src="@Url.Content(FinanceUi.Script)" asp-append-version="true"></script> }
+
+<template data-line-template="Lines">
+    <tr>
+        <td class="line-no"></td>
+        <td>
+            <select class="form-select" name="Lines[__i__].AccountId" data-search>
+                <option value="">Pick an account…</option>
+                @foreach (var a in Model.Accounts) { <option value="@a.Value">@a.Text</option> }
+            </select>
+        </td>
+        <td><input class="form-control money" name="Lines[__i__].Debit" type="number" step="0.01" min="0" inputmode="decimal" data-debit /></td>
+        <td><input class="form-control money" name="Lines[__i__].Credit" type="number" step="0.01" min="0" inputmode="decimal" data-credit /></td>
+        <td><input class="form-control" name="Lines[__i__].Narration" maxlength="300" /></td>
+        <td class="text-end"><button type="button" class="btn btn-sm btn-outline-secondary" data-remove-line title="Remove line"><i class="bi bi-x-lg"></i></button></td>
+    </tr>
+</template>
+
+<form method="post" asp-action="@(isNew ? "Create" : "Edit")" asp-route-id="@form.Id" class="card" novalidate>
+    <div class="card-body">
+        @if (errors.Count > 0)
+        {
+            <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>@if (errors.Count == 1) { @errors[0] } else { <ul class="mb-0">@foreach (var e in errors) { <li>@e</li> }</ul> }</div>
+        }
+        <div class="row g-3">
+            <div class="col-sm-4 col-lg-2">
+                <label class="form-label" for="Date">Date <span class="text-danger">*</span></label>
+                <input class="form-control" type="date" id="Date" name="Date" value="@FinanceUi.Iso(form.Date)" required />
+            </div>
+            <div class="col-sm-4 col-lg-2">
+                <label class="form-label" for="Type">Type <span class="text-danger">*</span></label>
+                <select class="form-select" id="Type" name="Type" asp-items="VouchersController.ManualTypes(form.Type)"></select>
+            </div>
+            <div class="col-lg-8">
+                <label class="form-label" for="Description">Description <span class="text-danger">*</span></label>
+                <input class="form-control" id="Description" name="Description" value="@form.Description" maxlength="500" required placeholder="What is this entry for?" />
+            </div>
+        </div>
+        <h2 class="form-section-title mt-4">Lines</h2>
+        <div class="table-responsive">
+            <table class="table lines-table mb-2" data-lines="Lines" data-voucher-lines>
+                <thead><tr><th>#</th><th style="min-width:280px">Account</th><th class="money" style="width:150px">Debit</th><th class="money" style="width:150px">Credit</th><th>Narration</th><th></th></tr></thead>
+                <tbody data-lines-body>
+                @for (var i = 0; i < form.Lines.Count; i++)
+                {
+                    var l = form.Lines[i];
+                    <tr>
+                        <td class="line-no">@(i + 1)</td>
+                        <td>
+                            <select class="form-select" name="Lines[@i].AccountId" data-search>
+                                <option value="">Pick an account…</option>
+                                @foreach (var a in Model.Accounts) { <option value="@a.Value" selected="@(a.Value == l.AccountId?.ToString())">@a.Text</option> }
+                            </select>
+                        </td>
+                        <td><input class="form-control money" name="Lines[@i].Debit" type="number" step="0.01" min="0" inputmode="decimal" value="@Amount(l.Debit)" data-debit /></td>
+                        <td><input class="form-control money" name="Lines[@i].Credit" type="number" step="0.01" min="0" inputmode="decimal" value="@Amount(l.Credit)" data-credit /></td>
+                        <td><input class="form-control" name="Lines[@i].Narration" value="@l.Narration" maxlength="300" /></td>
+                        <td class="text-end"><button type="button" class="btn btn-sm btn-outline-secondary" data-remove-line title="Remove line"><i class="bi bi-x-lg"></i></button></td>
+                    </tr>
+                }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td></td>
+                        <td><button type="button" class="btn btn-sm btn-outline-primary" data-add-line="Lines"><i class="bi bi-plus-lg me-1"></i>Add line</button></td>
+                        <td class="money" data-total="debit">$0.00</td>
+                        <td class="money" data-total="credit">$0.00</td>
+                        <td colspan="2">Difference: <span data-total="difference">–</span></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        <p class="form-text mb-0">Each line is either a debit or a credit. Debits and credits must be equal to post. Drafts can be saved unbalanced and don't appear in reports.</p>
+    </div>
+    <div class="card-footer bg-transparent d-flex gap-2 flex-wrap">
+        @if (Model.CanPost)
+        {
+            <button class="btn btn-primary" name="Intent" value="post" data-post-button><i class="bi bi-check2-circle me-1"></i>Save and post</button>
+        }
+        <button class="btn btn-outline-primary" name="Intent" value="draft"><i class="bi bi-file-earmark me-1"></i>Save as draft</button>
+        <a class="btn btn-outline-secondary" href="@(isNew ? Url.Action("Index") : Url.Action("Details", new { id = form.Id }))">Cancel</a>
+    </div>
+</form>

@@ -1,0 +1,7 @@
+@* Shown on paper only: who the report is for and what period it covers. Model: (title, scope, period). *@
+@model (string Title, string Scope, string Period)
+<div class="print-only mb-3">
+    <div class="fw-bold fs-5">Bushi Ban International · @Model.Scope</div>
+    <div class="fs-4 fw-bold">@Model.Title</div>
+    <div class="muted">@Model.Period</div>
+</div>

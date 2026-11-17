@@ -1,0 +1,73 @@
+@*
+    A student's billing at a glance, for the student profile.
+    Usage (in the CRM's student page):
+        @inject BushiBan.Web.Features.Billing.BillingService Billing
+        @if (User.HasPermission(Permissions.Billing.View, Permissions.Billing.ReceivePayments))
+        {
+            <partial name="~/Views/Billing/_StudentAccount.cshtml" model="await Billing.GetStudentSummaryAsync(student.Id)" />
+        }
+    Include ~/css/finance.css on the page for the badge colours (optional).
+*@
+@using BushiBan.Web.Features.Billing
+@model StudentAccountSummary?
+@if (Model is not null)
+{
+    var b = Model.Balance;
+    var canReceive = User.HasPermission(Permissions.Billing.ReceivePayments);
+    var canManage = User.HasPermission(Permissions.Billing.Manage);
+    var canView = User.HasPermission(Permissions.Billing.View);
+    <div class="card h-100">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+                <div class="card-title-sm mb-0">Billing</div>
+                @if (canView)
+                {
+                    <a class="small" asp-controller="Invoices" asp-action="Index" asp-route-studentId="@Model.StudentId">All invoices</a>
+                }
+            </div>
+            <div class="row g-3">
+                <div class="col-6">
+                    <div class="stat-label">Balance due</div>
+                    <div class="fs-4 fw-bold @(b.Net > 0 ? "" : "text-success")">@Format.Money(Math.Max(0, b.Net))</div>
+                    @if (b.Overdue > 0) { <div class="small text-danger"><i class="bi bi-exclamation-triangle me-1"></i>@Format.Money(b.Overdue) overdue</div> }
+                    else if (b.Open > 0) { <div class="small text-body-secondary">@Model.OpenInvoices open invoice(s), none overdue</div> }
+                    else { <div class="small text-body-secondary">All paid up</div> }
+                </div>
+                <div class="col-6">
+                    <div class="stat-label">Credit on account</div>
+                    <div class="fs-4 fw-bold">@Format.Money(b.Credit)</div>
+                    @if (b.Credit > 0) { <div class="small text-body-secondary">Used automatically on the next invoice</div> }
+                </div>
+            </div>
+            <hr />
+            <dl class="row small mb-0">
+                <dt class="col-5 fw-normal text-body-secondary">Contract</dt>
+                <dd class="col-7">
+                    @if (Model.ContractId is not null)
+                    {
+                        @if (canView) { <a asp-controller="Contracts" asp-action="Details" asp-route-id="@Model.ContractId">@Model.ContractProgram</a> } else { @Model.ContractProgram }
+                        <div class="text-body-secondary">@Format.Money(Model.ContractMonthly)/month · @Format.Date(Model.ContractStart) to @Format.Date(Model.ContractEnd)</div>
+                    }
+                    else { <span class="text-body-secondary">No active contract</span> }
+                </dd>
+                <dt class="col-5 fw-normal text-body-secondary">Last payment</dt>
+                <dd class="col-7 mb-0">
+                    @if (Model.LastPaymentId is not null)
+                    {
+                        @Format.Money(Model.LastPaymentAmount) <text>on</text> @Format.Date(Model.LastPaymentDate)
+                        @if (canView || canReceive) { <a class="ms-1" asp-controller="Payments" asp-action="Details" asp-route-id="@Model.LastPaymentId">@Model.LastPaymentReceipt</a> }
+                    }
+                    else { <span class="text-body-secondary">None yet</span> }
+                </dd>
+            </dl>
+            @if (canReceive || canManage)
+            {
+                <div class="d-flex gap-2 flex-wrap mt-3">
+                    @if (canReceive) { <a class="btn btn-sm btn-primary" asp-controller="Payments" asp-action="Create" asp-route-studentId="@Model.StudentId"><i class="bi bi-cash me-1"></i>Receive payment</a> }
+                    @if (canManage && Model.ContractId is null) { <a class="btn btn-sm btn-outline-primary" asp-controller="Contracts" asp-action="Create" asp-route-studentId="@Model.StudentId"><i class="bi bi-file-earmark-plus me-1"></i>New contract</a> }
+                    @if (canManage) { <a class="btn btn-sm btn-outline-secondary" asp-controller="Invoices" asp-action="Create" asp-route-studentId="@Model.StudentId"><i class="bi bi-receipt me-1"></i>New invoice</a> }
+                </div>
+            }
+        </div>
+    </div>
+}

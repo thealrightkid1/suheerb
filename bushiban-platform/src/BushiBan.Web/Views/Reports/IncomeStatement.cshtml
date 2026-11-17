@@ -1,0 +1,40 @@
+@using BushiBan.Web.Features.Accounting
+@model ReportPage<IncomeStatementReport>
+@{
+    ViewData["Title"] = "Income statement";
+    var r = Model.Report!;
+    var f = Model.Filter;
+    var period = $"{Format.Date(r.From)} to {Format.Date(r.To)}";
+    var ledgerQuery = $"from={FinanceUi.Iso(r.From)}&to={FinanceUi.Iso(r.To)}" + (f.Consolidated ? "&consolidated=true" : "");
+}
+@section Head { <link rel="stylesheet" href="@Url.Content(FinanceUi.Stylesheet)" asp-append-version="true" /> }
+@section Scripts { <script src="@Url.Content(FinanceUi.Script)" asp-append-version="true"></script> }
+@section Actions { <partial name="_ReportActions" /> }
+<partial name="_PrintHeader" model='("Income statement", Model.Scope, period)' />
+
+<div class="card" style="max-width: 980px">
+    <div class="card-header bg-transparent">
+        <form method="get" class="row g-2 align-items-end filter-bar">
+            <partial name="_PeriodFilter" model="(f, Model.CanConsolidate, false)" />
+            <div class="col-auto"><button class="btn btn-outline-secondary"><i class="bi bi-arrow-repeat me-1"></i>Update</button></div>
+        </form>
+        <div class="small muted mt-2 no-print" data-scope="@Model.Scope">@Model.Scope · @period</div>
+    </div>
+    <div class="table-responsive">
+        <table class="table align-middle mb-0 report-table">
+            <colgroup><col style="width: 9rem" /><col /><col style="width: 11rem" /></colgroup>
+            <tbody>
+                <partial name="_StatementSection" model='("Revenue", r.Revenue, r.GrossRevenue, "Total revenue", ledgerQuery)' />
+                @if (r.ContraRevenue.Count > 0)
+                {
+                    <partial name="_StatementSection" model='("Less: discounts and returns", r.ContraRevenue, r.TotalContraRevenue, "Total discounts and returns", ledgerQuery)' />
+                }
+                <tr class="subtotal"><td></td><td>Net revenue</td><td class="money">@FinanceUi.Money(r.NetRevenue)</td></tr>
+                <partial name="_StatementSection" model='("Expenses", r.Expenses, r.TotalExpenses, "Total expenses", ledgerQuery)' />
+            </tbody>
+            <tfoot>
+                <tr class="total"><td></td><td>Net income @(r.NetIncome < 0 ? "(loss)" : "")</td><td class="money">@FinanceUi.Money(r.NetIncome)</td></tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
