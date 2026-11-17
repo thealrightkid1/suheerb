@@ -1,0 +1,21 @@
+@model BushiBan.Web.Features.Attendance.KioskFormView
+@{
+    Layout = "_KioskLayout";
+    ViewData["Title"] = "Preview: " + Model.Name;
+    ViewData["KioskPreview"] = Model.PreviewLabel ?? "Preview";
+}
+<div class="kf-page">
+    <div class="kf-top d-flex flex-wrap gap-2 align-items-center">
+        <a class="btn btn-lg btn-light kf-back" asp-action="Edit" asp-route-id="@Model.FormId"><i class="bi bi-arrow-left me-1"></i>Back to the form builder</a>
+        <span class="text-body-secondary">This is exactly what families see. Nothing you enter here is saved.</span>
+    </div>
+    <form class="kiosk-card kf-card" onsubmit="return false" autocomplete="off" novalidate>
+        <h1 class="kf-title">@Model.Name</h1>
+        <partial name="~/Views/Kiosk/_FormFields.cshtml" model="Model" />
+        <div class="kf-submit">
+            <button class="btn btn-primary btn-lg kf-submit-btn" type="button" disabled title="Preview only"><i class="bi bi-send me-2"></i>Submit</button>
+            <p class="kf-privacy">Preview only. Submitting is turned off.</p>
+        </div>
+    </form>
+</div>
+@section Scripts { <script src="~/lib/signature_pad/signature_pad.umd.min.js"></script> }

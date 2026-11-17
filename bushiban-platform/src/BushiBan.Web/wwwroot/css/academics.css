@@ -1,0 +1,88 @@
+/* Attendance, academics and form builder staff screens. */
+
+/* Today's classes */
+.class-chips { display: flex; flex-wrap: wrap; gap: .5rem; }
+.class-chip { display: flex; flex-direction: column; padding: .55rem .85rem; border: 1px solid var(--card-border); border-radius: .65rem; text-decoration: none; color: var(--bs-body-color) !important; background: var(--bs-body-bg); min-width: 170px; line-height: 1.3; }
+.class-chip:hover { border-color: var(--bb-red); }
+.class-chip.active { border-color: var(--bb-red); box-shadow: inset 0 0 0 1px var(--bb-red); background: #fde8eb33; }
+.class-chip .time { font-size: .78rem; color: var(--bs-secondary-color); font-weight: 600; }
+.class-chip .name { font-weight: 600; }
+.class-chip .who { font-size: .78rem; color: var(--bs-secondary-color); }
+
+/* Roll call tiles: big tap targets for a tablet at the front desk */
+.roll-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: .65rem; }
+.roll-tile { position: relative; display: flex; align-items: center; gap: .75rem; padding: .85rem 1rem; border: 2px solid var(--card-border); border-radius: .8rem; cursor: pointer; user-select: none; min-height: 68px; background: var(--bs-body-bg); transition: border-color .1s, background .1s; }
+.roll-tile:hover { border-color: #94a3b8; }
+.roll-check { position: absolute; opacity: 0; pointer-events: none; }
+.roll-mark { width: 30px; height: 30px; flex: none; border-radius: 50%; border: 2px solid #cbd5e1; display: grid; place-items: center; color: transparent; font-size: 1.1rem; transition: all .1s; }
+.roll-body { display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
+.roll-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.roll-meta { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; font-size: .78rem; }
+.roll-tile:has(.roll-check:checked) { border-color: #16a34a; background: #16a34a14; }
+.roll-tile:has(.roll-check:checked) .roll-mark { background: #16a34a; border-color: #16a34a; color: #fff; }
+.roll-tile:has(.roll-check:focus-visible) { outline: 3px solid #16a34a55; }
+.roll-tile.locked { cursor: not-allowed; }
+.roll-footer { position: sticky; bottom: 0; background: var(--bs-body-bg) !important; z-index: 5; border-radius: 0 0 .75rem .75rem; }
+
+/* Method badges on attendance records */
+.badge[class*="method-"] { font-weight: 500; background: var(--bs-tertiary-bg); color: var(--bs-body-color); border: 1px solid var(--card-border); }
+.badge.method-kioskpin, .badge.method-kiosksearch { background: #e0ecff; color: #1d4ed8; border-color: #bfd4ff; }
+.badge.method-facerecognition, .badge.method-qrcode { background: #ede9fe; color: #6d28d9; border-color: #ddd6fe; }
+
+/* Ordered row editors */
+.rows-table td { vertical-align: middle; }
+.rows-table tr.dragging { opacity: .55; background: var(--bs-tertiary-bg); }
+.drag-handle { cursor: grab; color: var(--bs-secondary-color); text-align: center; touch-action: none; font-size: 1.15rem; }
+.drag-handle:active { cursor: grabbing; }
+
+/* Schedule */
+.day-picker { display: flex; flex-wrap: wrap; gap: .4rem; }
+.day-picker .btn { min-width: 3.6rem; }
+.day-picker .btn-check:checked + .btn { background: var(--bb-red); border-color: var(--bb-red); color: #fff; }
+.schedule-pill { display: inline-flex; align-items: center; border: 1px solid var(--card-border); border-radius: 2rem; padding: .25rem .7rem; font-size: .85rem; background: var(--bs-tertiary-bg); }
+.schedule-pill.inactive { opacity: .5; text-decoration: line-through; }
+
+/* Belts */
+.belt-lg { font-size: .9rem; }
+.belt-lg::before { width: 26px; height: 10px; }
+.belt-path { list-style: none; padding: 0; margin: 0; counter-reset: step; max-height: 420px; overflow: auto; }
+.belt-path li { display: flex; justify-content: space-between; align-items: center; gap: .5rem; padding: .35rem 0; border-bottom: 1px dashed var(--card-border); }
+.belt-path li:last-child { border-bottom: 0; }
+
+/* Promotions */
+.promo-stats { display: flex; gap: 1.5rem; flex-wrap: wrap; font-size: .85rem; color: var(--bs-secondary-color); }
+.promo-stats .n { font-size: 1.35rem; font-weight: 700; color: var(--bs-body-color); margin-right: .2rem; }
+.promo-stats .n.text-success { color: #16a34a !important; }
+.promo-stats .n.text-warning { color: #d97706 !important; }
+.promo-progress { height: 8px; }
+.promo-bar { position: sticky; bottom: 0; z-index: 5; box-shadow: 0 -6px 20px #0000000f; }
+
+/* Form builder */
+.fb-list { list-style: none; margin: 0; padding: 0; }
+.fb-list > li { display: flex; align-items: center; gap: .75rem; padding: .7rem 1rem; border-bottom: 1px solid var(--card-border); background: var(--bs-body-bg); }
+.fb-list > li:last-child { border-bottom: 0; }
+.fb-list > li.dragging { opacity: .5; }
+.fb-list > li.drop-before { box-shadow: inset 0 3px 0 var(--bb-red); }
+.fb-list .drag-handle { width: 1.5rem; }
+.fb-editor { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 420px); gap: 1rem; align-items: start; }
+@media (max-width: 1199.98px) { .fb-editor { grid-template-columns: 1fr; } }
+.fb-fields { max-height: calc(100vh - 220px); overflow: auto; }
+.fb-field { display: flex; align-items: center; gap: .6rem; padding: .55rem .75rem; border-bottom: 1px solid var(--card-border); cursor: pointer; background: var(--bs-body-bg); }
+.fb-field:hover { background: var(--bs-tertiary-bg); }
+.fb-field.selected { background: #fde8eb66; box-shadow: inset 3px 0 0 var(--bb-red); }
+.fb-field.dragging { opacity: .45; }
+.fb-field.drop-before { box-shadow: inset 0 3px 0 var(--bb-red); }
+.fb-field .fb-type { width: 2rem; height: 2rem; border-radius: .5rem; display: grid; place-items: center; background: var(--bs-tertiary-bg); color: var(--bs-secondary-color); flex: none; }
+.fb-field.is-heading { background: var(--bs-tertiary-bg); font-weight: 600; }
+.fb-field .fb-label { flex: 1; min-width: 0; }
+.fb-field .fb-label .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.fb-field .fb-label .k { font-size: .75rem; color: var(--bs-secondary-color); font-family: var(--bs-font-monospace); }
+.fb-field .fb-tags { display: flex; gap: .3rem; flex: none; }
+.fb-field .fb-tags .badge { font-weight: 500; }
+.fb-field .fb-actions { display: flex; gap: .25rem; flex: none; opacity: .4; }
+.fb-field:hover .fb-actions, .fb-field.selected .fb-actions { opacity: 1; }
+.fb-panel { position: sticky; top: calc(var(--topbar-h) + 1rem); }
+.fb-preview { border: 1px dashed var(--card-border); border-radius: .5rem; padding: .75rem 1rem; max-height: 260px; overflow: auto; font-size: .9rem; background: var(--bs-tertiary-bg); }
+.fb-preview > :last-child { margin-bottom: 0; }
+.fb-status { font-size: .85rem; }
+.fb-add-menu { max-height: 70vh; overflow: auto; }

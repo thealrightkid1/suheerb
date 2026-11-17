@@ -1,0 +1,106 @@
+@model BushiBan.Web.Features.Attendance.AttendanceReportPage
+@{
+    ViewData["Title"] = "Attendance report";
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Attendance", Url.Action("Index")), ("Report", null) };
+    var attended = Model.Summary.Count(s => s.Classes > 0);
+}
+@section Head { <link rel="stylesheet" href="~/css/academics.css" asp-append-version="true" /> }
+@section Actions {
+    <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print</button>
+}
+
+<div class="card mb-3 no-print">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-6 col-md-3 col-xl-2">
+                <label class="form-label small mb-1" for="from">From</label>
+                <input class="form-control" type="date" id="from" name="from" value="@Model.From.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-6 col-md-3 col-xl-2">
+                <label class="form-label small mb-1" for="to">To</label>
+                <input class="form-control" type="date" id="to" name="to" value="@Model.To.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-md-4 col-xl-3">
+                <label class="form-label small mb-1" for="courseId">Program</label>
+                <select class="form-select" id="courseId" name="courseId">
+                    <option value="">All programs</option>
+                    @foreach (var c in Model.Courses) { <option value="@c.Value" selected="@c.Selected">@c.Text</option> }
+                </select>
+            </div>
+            <div class="col-6 col-md-2 col-xl-2">
+                <label class="form-label small mb-1" for="days">Away for (days)</label>
+                <input class="form-control" type="number" min="1" max="365" id="days" name="days" value="@Model.Days" />
+            </div>
+            <div class="col-auto"><button class="btn btn-primary">Update</button></div>
+        </form>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-sm-4"><div class="card h-100"><div class="card-body stat">
+        <div class="stat-icon tint-blue"><i class="bi bi-people"></i></div>
+        <div><div class="stat-value">@attended / @Model.Summary.Count</div><div class="stat-label">Active students who came in</div></div>
+    </div></div></div>
+    <div class="col-sm-4"><div class="card h-100"><div class="card-body stat">
+        <div class="stat-icon tint-green"><i class="bi bi-check2-circle"></i></div>
+        <div><div class="stat-value">@Model.TotalClasses</div><div class="stat-label">Classes attended, @Format.Date(Model.From) – @Format.Date(Model.To)</div></div>
+    </div></div></div>
+    <div class="col-sm-4"><div class="card h-100"><div class="card-body stat">
+        <div class="stat-icon tint-amber"><i class="bi bi-hourglass-split"></i></div>
+        <div><div class="stat-value">@Model.Absent.Count</div><div class="stat-label">Not seen in @Model.Days+ days</div></div>
+    </div></div></div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header bg-transparent">
+        <div class="fw-semibold">Haven't been in for @Model.Days days or more</div>
+        <div class="small text-body-secondary">Active students whose last check-in was before @Format.Date(Model.Today.AddDays(-Model.Days)). A quick message often brings them back.</div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Student</th><th>Program</th><th>Last seen</th><th class="text-end">Days away</th><th>Phone</th><th class="text-end no-print">Contact</th></tr></thead>
+            <tbody>
+            @if (Model.Absent.Count == 0) { <tr><td colspan="6" class="empty">Everyone has been in within the last @Model.Days days.</td></tr> }
+            @foreach (var a in Model.Absent)
+            {
+                <tr>
+                    <td><a class="fw-medium" asp-controller="Students" asp-action="Details" asp-route-id="@a.StudentId">@a.Name</a> <span class="small text-body-secondary">@a.StudentNo</span></td>
+                    <td>@(a.Program ?? "—")</td>
+                    <td>@(a.LastSeen is null ? "Never checked in" : Format.Date(a.LastSeen))</td>
+                    <td class="text-end">@(a.DaysAway?.ToString() ?? "—")</td>
+                    <td class="text-nowrap">@a.Phone</td>
+                    <td class="text-end no-print">
+                        @if (Model.CanMessage)
+                        {
+                            <a class="btn btn-sm btn-outline-primary" href="@Url.Action("Compose", "Messages", new { studentId = a.StudentId })"><i class="bi bi-chat-left-text me-1"></i>Message</a>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-transparent fw-semibold">Classes attended per student, @Format.Date(Model.From) – @Format.Date(Model.To)</div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Student</th><th>Program</th><th>Belt</th><th class="text-end">Classes</th><th>Last class in period</th><th>Last seen</th></tr></thead>
+            <tbody>
+            @if (Model.Summary.Count == 0) { <tr><td colspan="6" class="empty">No active students match these filters.</td></tr> }
+            @foreach (var s in Model.Summary)
+            {
+                <tr class="@(s.Classes == 0 ? "text-body-secondary" : "")">
+                    <td><a class="fw-medium" asp-controller="Students" asp-action="Details" asp-route-id="@s.StudentId">@s.Name</a> <span class="small text-body-secondary">@s.StudentNo</span></td>
+                    <td>@(s.Program ?? "—")</td>
+                    <td>@if (s.Belt is not null) { <span class="belt" style="--belt:@(s.BeltColor ?? "#ccc")">@s.Belt</span> }</td>
+                    <td class="text-end fw-semibold">@s.Classes</td>
+                    <td>@Format.Date(s.LastInPeriod)</td>
+                    <td>@(s.LastSeen is null ? "Never" : Format.Date(s.LastSeen))</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

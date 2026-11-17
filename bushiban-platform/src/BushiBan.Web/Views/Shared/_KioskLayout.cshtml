@@ -1,0 +1,71 @@
+@* Full-screen, touch-first layout for the attendance and registration kiosks (and the form builder preview).
+   No sidebar or staff links. "Exit kiosk" signs the kiosk account out, so getting back in needs its password. *@
+@using Microsoft.EntityFrameworkCore
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@inject BushiBan.Web.Data.AppDbContext Db
+@inject BushiBan.Web.Services.ICurrentBranch CurrentBranch
+@{
+    var title = ViewData["Title"] as string ?? "Kiosk";
+    var preview = ViewData["KioskPreview"] as string;
+    var home = ViewData["KioskHome"] as string;
+    var branch = CurrentBranch.BranchId is int b
+        ? await Db.Branches.AsNoTracking().Where(x => x.Id == b).Select(x => new { x.Name, x.TimeZone }).FirstOrDefaultAsync()
+        : null;
+}
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="robots" content="noindex" />
+    <meta name="csrf-token" content="@Antiforgery.GetAndStoreTokens(Context).RequestToken" />
+    <title>@title · Bushi Ban</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="~/lib/tom-select/tom-select.bootstrap5.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/kiosk.css" asp-append-version="true" />
+    <link rel="icon" href="~/img/logo.svg" type="image/svg+xml" />
+    @await RenderSectionAsync("Head", required: false)
+</head>
+<body class="kiosk @ViewData["KioskBodyClass"]">
+    <header class="kiosk-bar">
+        @if (home is not null)
+        {
+            <a class="kiosk-brand" href="@home" aria-label="Start over">
+                <img src="~/img/logo.svg" alt="" width="40" height="40" />
+                <span><strong>Bushi Ban</strong><small>@branch?.Name</small></span>
+            </a>
+        }
+        else
+        {
+            <div class="kiosk-brand">
+                <img src="~/img/logo.svg" alt="" width="40" height="40" />
+                <span><strong>Bushi Ban</strong><small>@branch?.Name</small></span>
+            </div>
+        }
+        <div class="kiosk-clock" id="kioskClock" data-tz="@(branch?.TimeZone ?? "America/Chicago")" aria-live="off">
+            <span class="time"></span><span class="date"></span>
+        </div>
+        @if (preview is not null)
+        {
+            <span class="kiosk-preview-tag"><i class="bi bi-eye me-1"></i>@preview</span>
+        }
+        else
+        {
+            <form method="post" asp-controller="Account" asp-action="Logout" class="kiosk-exit-form"
+                  data-confirm="Exit the kiosk? Staff will need this kiosk account's password to sign back in.">
+                <button class="btn kiosk-exit" type="submit"><i class="bi bi-box-arrow-right"></i><span>Exit kiosk</span></button>
+            </form>
+        }
+    </header>
+    <main class="kiosk-main">
+        @RenderBody()
+    </main>
+
+    <script src="~/lib/tom-select/tom-select.complete.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+    <script src="~/js/kiosk.js" asp-append-version="true"></script>
+</body>
+</html>

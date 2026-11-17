@@ -1,0 +1,12 @@
+@{
+    Layout = "_KioskLayout";
+    ViewData["Title"] = "Form not available";
+    ViewData["KioskHome"] = Url.Action("Register");
+}
+<div class="kiosk-card kiosk-done kiosk-sorry" data-auto-return="@Url.Action("Register")" data-seconds="15">
+    <div class="kiosk-done-icon"><i class="bi bi-info-circle-fill"></i></div>
+    <h1>This form isn't available right now</h1>
+    <p>Please see the front desk and we'll help you get started.</p>
+    <a class="btn btn-primary btn-lg" asp-action="Register">Back to all forms</a>
+    <div class="kiosk-countdown"><span></span></div>
+</div>

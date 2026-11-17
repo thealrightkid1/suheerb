@@ -1,0 +1,174 @@
+@model BushiBan.Web.Features.Academics.CourseForm
+@using BushiBan.Web.Features.Academics
+@{
+    var isNew = Model.Id == 0;
+    ViewData["Title"] = isNew ? "Add program" : "Edit " + Model.Name;
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Programs", Url.Action("Index")), (isNew ? "Add" : "Edit", null) };
+    string? Err(string key) => ViewData.ModelState.TryGetValue(key, out var e) && e.Errors.Count > 0 ? e.Errors[0].ErrorMessage : null;
+    string Invalid(string key) => Err(key) is null ? "" : "is-invalid";
+    var perDay = Model.ScheduleMode == CourseForm.PerDay;
+}
+@section Head { <link rel="stylesheet" href="~/css/academics.css" asp-append-version="true" /> }
+<form method="post" class="card form-card" novalidate>
+    <div class="card-body">
+        @if (!ViewData.ModelState.IsValid) { <div class="alert alert-danger py-2">Please fix the highlighted fields.</div> }
+        <h2 class="form-section-title">Program details</h2>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label" for="Name">Name <span class="text-danger">*</span></label>
+                <input class="form-control @Invalid("Name")" id="Name" name="Name" value="@Model.Name" maxlength="120" required />
+                @if (Err("Name") is string e) { <div class="invalid-feedback">@e</div> }
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="FeeStructureId">Fee structure</label>
+                <select class="form-select @Invalid("FeeStructureId")" id="FeeStructureId" name="FeeStructureId">
+                    <option value="">No fee structure</option>
+                    @foreach (var f in Model.FeeStructures) { <option value="@f.Value" selected="@f.Selected">@f.Text</option> }
+                </select>
+                @if (Err("FeeStructureId") is string e2) { <div class="invalid-feedback">@e2</div> }
+            </div>
+            <div class="col-12">
+                <label class="form-label" for="Description">Description</label>
+                <textarea class="form-control" id="Description" name="Description" rows="2" maxlength="500">@Model.Description</textarea>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label" for="MinimumTermMonths">Minimum term (months) <span class="text-danger">*</span></label>
+                <input class="form-control @Invalid("MinimumTermMonths")" type="number" min="1" max="120" id="MinimumTermMonths" name="MinimumTermMonths" value="@Model.MinimumTermMonths" />
+                @if (Err("MinimumTermMonths") is string e3) { <div class="invalid-feedback">@e3</div> }
+            </div>
+            <div class="col-sm-6 col-md-3 d-flex align-items-end">
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" role="switch" id="IsActive" name="IsActive" value="true" checked="@Model.IsActive" />
+                    <input type="hidden" name="IsActive" value="false" />  @* after the checkbox: MVC binds the first value *@
+                    <label class="form-check-label" for="IsActive">Active</label>
+                </div>
+            </div>
+        </div>
+
+        <h2 class="form-section-title mt-4">Ranking systems</h2>
+        <p class="small text-body-secondary">The first system is the belt path used for promotions. Add more if students continue on another path (for example, Dan grades).</p>
+        @if (Err("RankingSystemIds") is string e4) { <div class="alert alert-danger py-2">@e4</div> }
+        <div data-rows="RankingSystemIds" data-min="0" data-simple>
+            <table class="table align-middle rows-table mb-2" style="max-width:640px">
+                <tbody data-rows-body>
+                @for (var i = 0; i < Model.RankingSystemIds.Count; i++)
+                {
+                    <tr data-row>
+                        <td class="drag-handle" style="width:2.5rem" title="Drag to reorder"><i class="bi bi-grip-vertical"></i></td>
+                        <td class="text-body-secondary" style="width:2.5rem" data-row-index>@(i + 1)</td>
+                        <td>
+                            <select class="form-select" name="RankingSystemIds[@i]" aria-label="Ranking system">
+                                @foreach (var o in Model.RankingSystemOptions) { <option value="@o.Value" selected="@(o.Value == Model.RankingSystemIds[i]?.ToString())">@o.Text</option> }
+                            </select>
+                        </td>
+                        <td class="text-end text-nowrap" style="width:7.5rem">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-row-up title="Move up"><i class="bi bi-arrow-up"></i></button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-row-down title="Move down"><i class="bi bi-arrow-down"></i></button>
+                            <button type="button" class="btn btn-sm btn-outline-danger" data-row-remove title="Remove"><i class="bi bi-x-lg"></i></button>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+            <template data-row-template>
+                <tr data-row>
+                    <td class="drag-handle" style="width:2.5rem" title="Drag to reorder"><i class="bi bi-grip-vertical"></i></td>
+                    <td class="text-body-secondary" style="width:2.5rem" data-row-index></td>
+                    <td>
+                        <select class="form-select" name="RankingSystemIds[__i__]" aria-label="Ranking system">
+                            @foreach (var o in Model.RankingSystemOptions) { <option value="@o.Value">@o.Text</option> }
+                        </select>
+                    </td>
+                    <td class="text-end text-nowrap" style="width:7.5rem">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-row-up title="Move up"><i class="bi bi-arrow-up"></i></button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-row-down title="Move down"><i class="bi bi-arrow-down"></i></button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" data-row-remove title="Remove"><i class="bi bi-x-lg"></i></button>
+                    </td>
+                </tr>
+            </template>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-row-add @(Model.RankingSystemOptions.Count == 0 ? "disabled" : "")><i class="bi bi-plus-lg me-1"></i>Add ranking system</button>
+        </div>
+
+        <h2 class="form-section-title mt-4">Class schedule</h2>
+        <div class="btn-group mb-3" role="group" aria-label="Schedule type">
+            <input type="radio" class="btn-check" name="ScheduleMode" id="modeSame" value="@CourseForm.SameTime" checked="@(!perDay)" data-schedule-mode />
+            <label class="btn btn-outline-secondary" for="modeSame">Same time on chosen days</label>
+            <input type="radio" class="btn-check" name="ScheduleMode" id="modePerDay" value="@CourseForm.PerDay" checked="@perDay" data-schedule-mode />
+            <label class="btn btn-outline-secondary" for="modePerDay">Different times per day</label>
+        </div>
+
+        <div data-schedule-panel="@CourseForm.SameTime" hidden="@perDay">
+            <label class="form-label d-block">Days</label>
+            <div class="day-picker mb-3">
+                @foreach (var d in CourseForm.Week)
+                {
+                    <input type="checkbox" class="btn-check" id="day@(d)" name="Days" value="@d" checked="@Model.Days.Contains(d)" />
+                    <label class="btn btn-outline-secondary" for="day@(d)">@d.ToString()[..3]</label>
+                }
+            </div>
+            <div class="row g-3">
+                <div class="col-sm-4 col-md-3">
+                    <label class="form-label" for="StartTime">Start time</label>
+                    <input class="form-control @Invalid("StartTime")" type="time" id="StartTime" name="StartTime" value="@Model.StartTime" />
+                    @if (Err("StartTime") is string e5) { <div class="invalid-feedback">@e5</div> }
+                </div>
+                <div class="col-sm-4 col-md-3">
+                    <label class="form-label" for="DurationMinutes">Length (minutes)</label>
+                    <input class="form-control @Invalid("DurationMinutes")" type="number" min="5" max="600" step="5" id="DurationMinutes" name="DurationMinutes" value="@Model.DurationMinutes" />
+                    @if (Err("DurationMinutes") is string e6) { <div class="invalid-feedback">@e6</div> }
+                </div>
+                <div class="col-sm-4 col-md-4">
+                    <label class="form-label" for="Instructor">Instructor (optional)</label>
+                    <input class="form-control" id="Instructor" name="Instructor" value="@Model.Instructor" maxlength="80" />
+                </div>
+            </div>
+        </div>
+
+        <div data-schedule-panel="@CourseForm.PerDay" hidden="@(!perDay)">
+            @if (Err("Rows") is string e7) { <div class="alert alert-danger py-2">@e7</div> }
+            <div data-rows="Rows" data-min="0">
+                <div class="table-responsive">
+                    <table class="table align-middle rows-table mb-2">
+                        <thead><tr><th>Day</th><th>Start time</th><th>Length (minutes)</th><th>Instructor</th><th></th></tr></thead>
+                        <tbody data-rows-body>
+                        @for (var i = 0; i < Model.Rows.Count; i++)
+                        {
+                            var r = Model.Rows[i];
+                            <tr data-row>
+                                <td>
+                                    <select class="form-select" name="Rows[@i].Day" aria-label="Day">
+                                        @foreach (var d in CourseForm.Week) { <option value="@d" selected="@(r.Day == d)">@d</option> }
+                                    </select>
+                                </td>
+                                <td><input class="form-control @Invalid($"Rows[{i}].StartTime")" type="time" name="Rows[@i].StartTime" value="@r.StartTime" aria-label="Start time" /></td>
+                                <td><input class="form-control @Invalid($"Rows[{i}].DurationMinutes")" type="number" min="5" max="600" step="5" name="Rows[@i].DurationMinutes" value="@r.DurationMinutes" aria-label="Length in minutes" /></td>
+                                <td><input class="form-control" name="Rows[@i].Instructor" value="@r.Instructor" maxlength="80" aria-label="Instructor" /></td>
+                                <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger" data-row-remove title="Remove"><i class="bi bi-x-lg"></i></button></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                <template data-row-template>
+                    <tr data-row>
+                        <td>
+                            <select class="form-select" name="Rows[__i__].Day" aria-label="Day">
+                                @foreach (var d in CourseForm.Week) { <option value="@d">@d</option> }
+                            </select>
+                        </td>
+                        <td><input class="form-control" type="time" name="Rows[__i__].StartTime" value="17:00" aria-label="Start time" /></td>
+                        <td><input class="form-control" type="number" min="5" max="600" step="5" name="Rows[__i__].DurationMinutes" value="60" aria-label="Length in minutes" /></td>
+                        <td><input class="form-control" name="Rows[__i__].Instructor" maxlength="80" aria-label="Instructor" /></td>
+                        <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger" data-row-remove title="Remove"><i class="bi bi-x-lg"></i></button></td>
+                    </tr>
+                </template>
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-row-add><i class="bi bi-plus-lg me-1"></i>Add class</button>
+            </div>
+        </div>
+    </div>
+    <div class="card-footer bg-transparent d-flex gap-2">
+        <button class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>@(isNew ? "Create program" : "Save changes")</button>
+        <a class="btn btn-outline-secondary" href="@(isNew ? Url.Action("Index") : Url.Action("Details", new { id = Model.Id }))">Cancel</a>
+    </div>
+</form>
+@section Scripts { <script src="~/js/academics.js" asp-append-version="true"></script> }

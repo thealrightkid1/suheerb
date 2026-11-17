@@ -1,0 +1,44 @@
+@model BushiBan.Web.Features.Academics.FormCreateModel
+@{
+    ViewData["Title"] = "New form";
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Form builder", Url.Action("Index")), ("New form", null) };
+    string? Err(string key) => ViewData.ModelState.TryGetValue(key, out var e) && e.Errors.Count > 0 ? e.Errors[0].ErrorMessage : null;
+}
+<form method="post" class="card form-card" style="max-width:760px" novalidate>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-12">
+                <label class="form-label" for="Name">Form name <span class="text-danger">*</span></label>
+                <input class="form-control @(Err("Name") is null ? "" : "is-invalid")" id="Name" name="Name" value="@Model.Name" maxlength="200" required placeholder="e.g. Summer Camp Registration" />
+                @if (Err("Name") is string e1) { <div class="invalid-feedback">@e1</div> }
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="Category">Category</label>
+                <select class="form-select" id="Category" name="Category">
+                    @foreach (var c in Enum.GetValues<FormCategory>()) { <option value="@c" selected="@(Model.Category == c)">@c.DisplayName()</option> }
+                </select>
+                <div class="form-text">Admission forms automatically create a lead (or link to an existing one).</div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="CourseId">Program</label>
+                <select class="form-select @(Err("CourseId") is null ? "" : "is-invalid")" id="CourseId" name="CourseId">
+                    <option value="">None</option>
+                    @foreach (var c in Model.Courses) { <option value="@c.Value" selected="@c.Selected">@c.Text</option> }
+                </select>
+                <div class="form-text">For enrollment agreements: the program this form enrolls into.</div>
+            </div>
+            <div class="col-12">
+                <label class="form-label" for="CloneFromId">Start from</label>
+                <select class="form-select @(Err("CloneFromId") is null ? "" : "is-invalid")" id="CloneFromId" name="CloneFromId" data-search>
+                    <option value="">A blank form with name, phone, email and signature</option>
+                    @foreach (var f in Model.Forms) { <option value="@f.Value" selected="@f.Selected">A copy of: @f.Text</option> }
+                </select>
+                @if (Err("CloneFromId") is string e2) { <div class="invalid-feedback">@e2</div> }
+            </div>
+        </div>
+    </div>
+    <div class="card-footer bg-transparent d-flex gap-2">
+        <button class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Create and edit fields</button>
+        <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+    </div>
+</form>

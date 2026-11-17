@@ -1,0 +1,102 @@
+@model BushiBan.Web.Features.Attendance.AttendanceIndexPage
+@{
+    ViewData["Title"] = "Attendance records";
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Attendance", null) };
+    var f = Model.Filter;
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    var exportQuery = new Dictionary<string, string?>
+    {
+        ["from"] = f.From?.ToString("yyyy-MM-dd"), ["to"] = f.To?.ToString("yyyy-MM-dd"), ["q"] = f.Q,
+        ["courseId"] = f.CourseId?.ToString(), ["method"] = f.Method?.ToString(),
+    };
+}
+@section Actions {
+    <a class="btn btn-outline-secondary" asp-action="Report"><i class="bi bi-bar-chart me-1"></i>Report</a>
+    <a class="btn btn-outline-secondary" asp-action="Export" asp-all-route-data="@exportQuery.Where(kv => kv.Value != null).ToDictionary(kv => kv.Key, kv => kv.Value!)"><i class="bi bi-download me-1"></i>Export CSV</a>
+    @if (User.HasPermission(Permissions.Attendance.Create))
+    {
+        <a class="btn btn-primary" asp-action="Roll"><i class="bi bi-check2-square me-1"></i>Take attendance</a>
+    }
+}
+<div class="card">
+    <div class="card-header bg-transparent">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-6 col-md-3 col-xl-2">
+                <label class="form-label small mb-1" for="from">From</label>
+                <input class="form-control" type="date" id="from" name="from" value="@f.From?.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-6 col-md-3 col-xl-2">
+                <label class="form-label small mb-1" for="to">To</label>
+                <input class="form-control" type="date" id="to" name="to" value="@f.To?.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-md-6 col-xl-3">
+                <label class="form-label small mb-1" for="q">Student</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input class="form-control" id="q" name="q" value="@f.Q" placeholder="Name or student number" />
+                </div>
+            </div>
+            <div class="col-md-4 col-xl-2">
+                <label class="form-label small mb-1" for="courseId">Program</label>
+                <select class="form-select" id="courseId" name="courseId">
+                    <option value="">All programs</option>
+                    @foreach (var c in Model.Courses) { <option value="@c.Value" selected="@c.Selected">@c.Text</option> }
+                </select>
+            </div>
+            <div class="col-md-4 col-xl-2">
+                <label class="form-label small mb-1" for="method">Method</label>
+                <select class="form-select" id="method" name="method">
+                    <option value="">Any method</option>
+                    @foreach (var m in Enum.GetValues<CheckInMethod>()) { <option value="@m" selected="@(f.Method == m)">@m.DisplayName()</option> }
+                </select>
+            </div>
+            <div class="col-md-4 col-xl-1 d-flex gap-1">
+                <button class="btn btn-primary w-100">Filter</button>
+            </div>
+            <div class="col-12 small"><a asp-action="Index">Reset to the last 7 days</a></div>
+        </form>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr>
+                <th>Student</th><th>Date</th><th>Check-in time</th><th>Program</th><th>Method</th><th>Marked by</th><th class="text-end">Confidence</th>
+                @if (Model.CanEdit || Model.CanDelete) { <th class="text-end">Actions</th> }
+            </tr></thead>
+            <tbody>
+            @if (Model.Rows.Items.Count == 0)
+            {
+                <tr><td colspan="8" class="empty">No check-ins match these filters.</td></tr>
+            }
+            @foreach (var r in Model.Rows.Items)
+            {
+                <tr>
+                    <td>
+                        <a class="fw-medium" asp-controller="Students" asp-action="Details" asp-route-id="@r.StudentId">@r.StudentName</a>
+                        <div class="small text-body-secondary">@r.StudentNo</div>
+                    </td>
+                    <td class="text-nowrap">@Format.Date(r.Date)</td>
+                    <td class="text-nowrap">@Format.Time(r.CheckInTime)</td>
+                    <td>@(r.Program ?? "—")</td>
+                    <td><span class="badge method-@r.Method.ToString().ToLowerInvariant()">@r.Method.DisplayName()</span></td>
+                    <td>@r.MarkedBy</td>
+                    <td class="text-end">@(r.Confidence is decimal c ? c.ToString("0.#") + "%" : "—")</td>
+                    @if (Model.CanEdit || Model.CanDelete)
+                    {
+                        <td class="text-end text-nowrap">
+                            @if (Model.CanEdit) { <a class="btn btn-sm btn-outline-secondary" asp-action="Edit" asp-route-id="@r.Id" asp-route-returnUrl="@returnUrl" title="Edit"><i class="bi bi-pencil"></i></a> }
+                            @if (Model.CanDelete)
+                            {
+                                <form method="post" asp-action="Delete" asp-route-id="@r.Id" asp-route-returnUrl="@returnUrl" class="d-inline" data-confirm="Delete @r.StudentName's check-in on @Format.Date(r.Date)?">
+                                    <button class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
+                                </form>
+                            }
+                        </td>
+                    }
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+<partial name="_Pager" model="(Model.Rows.Page, Model.Rows.Pages, Model.Rows.Total)" />
+@section Head { <link rel="stylesheet" href="~/css/academics.css" asp-append-version="true" /> }
