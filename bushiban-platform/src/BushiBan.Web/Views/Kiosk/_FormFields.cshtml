@@ -1,0 +1,110 @@
+@* Renders a kiosk form's fields. Shared by the registration kiosk and the form builder preview, so staff see exactly what families see. *@
+@model BushiBan.Web.Features.Attendance.KioskFormView
+@using BushiBan.Web.Features.Academics
+@{
+    const string P = KioskFormService.InputPrefix;
+    var groups = Model.Cities.GroupBy(c => c.Group?.Name ?? "").ToList();
+}
+<div class="row g-4 kf" data-kiosk-form>
+@foreach (var f in Model.Fields)
+{
+    var wide = f.Type is "heading" or "notice" || f.Width != "half";
+    var name = P + f.Key;
+    var id = "fld_" + f.Key;
+    var err = Model.Error(f.Key);
+    var value = Model.Value(f.Key);
+    var options = f.Options ?? new List<string>();
+
+    if (f.Type == "heading")
+    {
+        <div class="col-12 kf-field kf-heading-wrap"><h2 class="kf-heading">@f.Label</h2></div>
+        continue;
+    }
+    if (f.Type == "notice")
+    {
+        <div class="col-12 kf-field"><div class="kf-notice">@Html.Raw(f.Html)</div></div>
+        continue;
+    }
+
+    <div class="@(wide ? "col-12" : "col-md-6") kf-field kf-@f.Type @(err is null ? "" : "has-error")"
+         data-key="@f.Key" data-type="@f.Type" data-required="@(f.Required ? "true" : "false")">
+        @if (f.Type == "checkbox")
+        {
+            <label class="kf-agree" for="@id">
+                <input class="form-check-input" type="checkbox" id="@id" name="@name" value="Yes" checked="@(value.Length > 0)" />
+                <span>@f.Label @if (f.Required) { <span class="kf-req" aria-hidden="true">*</span> }</span>
+            </label>
+        }
+        else
+        {
+            <label class="kf-label" id="@(id)_label" for="@(f.Type is "radio" or "checkboxes" or "signature" ? null : id)">
+                @f.Label @if (f.Required) { <span class="kf-req" aria-hidden="true">*</span><span class="visually-hidden">(required)</span> }
+            </label>
+            @if (!string.IsNullOrWhiteSpace(f.Help)) { <div class="kf-help">@f.Help</div> }
+
+            switch (f.Type)
+            {
+                case "textarea":
+                    <textarea class="form-control form-control-lg" id="@id" name="@name" rows="4" maxlength="4000" placeholder="@f.Placeholder" autocomplete="off">@value</textarea>
+                    break;
+                case "select":
+                    <select class="form-select form-select-lg" id="@id" name="@name">
+                        <option value="">@(f.Placeholder ?? "Choose…")</option>
+                        @foreach (var o in options) { <option value="@o" selected="@(o == value)">@o</option> }
+                    </select>
+                    break;
+                case "city":
+                    <select class="form-select form-select-lg" id="@id" name="@name" data-search data-city>
+                        <option value="">@(f.Placeholder ?? "Start typing your city…")</option>
+                        @foreach (var g in groups)
+                        {
+                            <optgroup label="@g.Key">
+                                @foreach (var c in g) { <option value="@c.Value" selected="@(c.Value == value)">@c.Text</option> }
+                            </optgroup>
+                        }
+                    </select>
+                    break;
+                case "radio":
+                    <div class="kf-choices @(options.Count > 3 || options.Any(o => o.Length > 14) ? "kf-choices-wrap" : "")" role="radiogroup" aria-labelledby="@(id)_label">
+                        @for (var i = 0; i < options.Count; i++)
+                        {
+                            <input class="btn-check" type="radio" id="@(id)_@i" name="@name" value="@options[i]" checked="@(options[i] == value)" autocomplete="off" />
+                            <label class="kf-choice" for="@(id)_@i">@options[i]</label>
+                        }
+                    </div>
+                    break;
+                case "checkboxes":
+                    <div class="kf-choices kf-multi" role="group" aria-labelledby="@(id)_label">
+                        @for (var i = 0; i < options.Count; i++)
+                        {
+                            <input class="btn-check" type="checkbox" id="@(id)_@i" name="@name" value="@options[i]" checked="@Model.Has(f.Key, options[i])" autocomplete="off" />
+                            <label class="kf-choice" for="@(id)_@i"><i class="bi bi-check-lg"></i><span>@options[i]</span></label>
+                        }
+                    </div>
+                    break;
+                case "signature":
+                    <div class="kf-sig" role="group" aria-labelledby="@(id)_label">
+                        <canvas class="kf-sig-pad" aria-label="Sign here with your finger"></canvas>
+                        <div class="kf-sig-line"><span>Sign above</span></div>
+                        <button type="button" class="btn btn-outline-secondary kf-sig-clear"><i class="bi bi-eraser me-1"></i>Clear</button>
+                        <input type="hidden" class="kf-sig-data" name="@name" value="@value" />
+                    </div>
+                    break;
+                default:
+                    var (type, mode, cap) = f.Type switch
+                    {
+                        "email" => ("email", "email", "off"),
+                        "tel" => ("tel", "tel", "off"),
+                        "number" => ("text", "decimal", "off"),
+                        "date" => ("date", (string?)null, "off"),
+                        _ => ("text", (string?)null, "words"),
+                    };
+                    <input class="form-control form-control-lg" type="@type" id="@id" name="@name" value="@value" inputmode="@mode"
+                           placeholder="@f.Placeholder" maxlength="500" autocomplete="off" autocapitalize="@cap" spellcheck="false" />
+                    break;
+            }
+        }
+        <div class="kf-error" role="alert">@err</div>
+    </div>
+}
+</div>

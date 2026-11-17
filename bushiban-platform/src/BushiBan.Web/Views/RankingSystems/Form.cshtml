@@ -1,0 +1,94 @@
+@model BushiBan.Web.Features.Academics.RankingSystemForm
+@{
+    var isNew = Model.Id == 0;
+    ViewData["Title"] = isNew ? "Add ranking system" : "Edit " + Model.Name;
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Ranking systems", Url.Action("Index")), (isNew ? "Add" : "Edit", null) };
+    string? Err(string key) => ViewData.ModelState.TryGetValue(key, out var e) && e.Errors.Count > 0 ? e.Errors[0].ErrorMessage : null;
+    var colorsJson = System.Text.Json.JsonSerializer.Serialize(Model.RankColors);
+}
+@section Head { <link rel="stylesheet" href="~/css/academics.css" asp-append-version="true" /> }
+<form method="post" class="card form-card" novalidate>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label" for="Name">Name <span class="text-danger">*</span></label>
+                <input class="form-control @(Err("Name") is null ? "" : "is-invalid")" id="Name" name="Name" value="@Model.Name" maxlength="120" required />
+                @if (Err("Name") is string e1) { <div class="invalid-feedback">@e1</div> }
+            </div>
+            <div class="col-md-6 d-flex align-items-end">
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" role="switch" id="IsActive" name="IsActive" value="true" checked="@Model.IsActive" />
+                    <input type="hidden" name="IsActive" value="false" />  @* after the checkbox: MVC binds the first value *@
+                    <label class="form-check-label" for="IsActive">Active</label>
+                </div>
+            </div>
+            <div class="col-12">
+                <label class="form-label" for="Description">Description</label>
+                <input class="form-control" id="Description" name="Description" value="@Model.Description" maxlength="500" />
+            </div>
+        </div>
+
+        <h2 class="form-section-title mt-4">Belts in order</h2>
+        <p class="small text-body-secondary">List the belts from first to last. Students test for the next belt once they've spent the days at their current belt and attended the minimum classes. Drag <i class="bi bi-grip-vertical"></i> or use the arrows to reorder.</p>
+        @if (Err("Steps") is string e2) { <div class="alert alert-danger py-2">@e2</div> }
+        <div data-rows="Steps" data-min="1" data-colors="@colorsJson">
+            <div class="table-responsive">
+                <table class="table align-middle rows-table mb-2">
+                    <thead><tr><th style="width:3.5rem"></th><th style="width:3rem">#</th><th>Belt</th><th style="width:150px">Days at belt</th><th style="width:150px">Minimum classes</th><th style="width:7.5rem"></th></tr></thead>
+                    <tbody data-rows-body>
+                    @for (var i = 0; i < Model.Steps.Count; i++)
+                    {
+                        var s = Model.Steps[i];
+                        var rankErr = Err($"Steps[{i}].RankId");
+                        var daysErr = Err($"Steps[{i}].DurationInDays");
+                        var minErr = Err($"Steps[{i}].MinimumClasses");
+                        <tr data-row>
+                            <td class="drag-handle" title="Drag to reorder"><i class="bi bi-grip-vertical"></i></td>
+                            <td class="text-body-secondary" data-row-index>@(i + 1)</td>
+                            <td>
+                                <select class="form-select @(rankErr is null ? "" : "is-invalid")" name="Steps[@i].RankId" data-belt-select aria-label="Belt">
+                                    <option value="">Pick a belt…</option>
+                                    @foreach (var r in Model.RankOptions) { <option value="@r.Value" selected="@(r.Value == s.RankId?.ToString())">@r.Text</option> }
+                                </select>
+                                @if (rankErr is not null) { <div class="invalid-feedback">@rankErr</div> }
+                            </td>
+                            <td><input class="form-control @(daysErr is null ? "" : "is-invalid")" type="number" min="0" max="3650" name="Steps[@i].DurationInDays" value="@s.DurationInDays" aria-label="Days at belt" />@if (daysErr is not null) { <div class="invalid-feedback">@daysErr</div> }</td>
+                            <td><input class="form-control @(minErr is null ? "" : "is-invalid")" type="number" min="0" max="1000" name="Steps[@i].MinimumClasses" value="@s.MinimumClasses" aria-label="Minimum classes" />@if (minErr is not null) { <div class="invalid-feedback">@minErr</div> }</td>
+                            <td class="text-end text-nowrap">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-row-up title="Move up"><i class="bi bi-arrow-up"></i></button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-row-down title="Move down"><i class="bi bi-arrow-down"></i></button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" data-row-remove title="Remove"><i class="bi bi-x-lg"></i></button>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            <template data-row-template>
+                <tr data-row>
+                    <td class="drag-handle" title="Drag to reorder"><i class="bi bi-grip-vertical"></i></td>
+                    <td class="text-body-secondary" data-row-index></td>
+                    <td>
+                        <select class="form-select" name="Steps[__i__].RankId" data-belt-select aria-label="Belt">
+                            <option value="">Pick a belt…</option>
+                            @foreach (var r in Model.RankOptions) { <option value="@r.Value">@r.Text</option> }
+                        </select>
+                    </td>
+                    <td><input class="form-control" type="number" min="0" max="3650" name="Steps[__i__].DurationInDays" value="90" aria-label="Days at belt" /></td>
+                    <td><input class="form-control" type="number" min="0" max="1000" name="Steps[__i__].MinimumClasses" value="0" aria-label="Minimum classes" /></td>
+                    <td class="text-end text-nowrap">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-row-up title="Move up"><i class="bi bi-arrow-up"></i></button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-row-down title="Move down"><i class="bi bi-arrow-down"></i></button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" data-row-remove title="Remove"><i class="bi bi-x-lg"></i></button>
+                    </td>
+                </tr>
+            </template>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-row-add><i class="bi bi-plus-lg me-1"></i>Add belt</button>
+        </div>
+    </div>
+    <div class="card-footer bg-transparent d-flex gap-2">
+        <button class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>@(isNew ? "Create" : "Save changes")</button>
+        <a class="btn btn-outline-secondary" href="@(isNew ? Url.Action("Index") : Url.Action("Details", new { id = Model.Id }))">Cancel</a>
+    </div>
+</form>
+@section Scripts { <script src="~/js/academics.js" asp-append-version="true"></script> }

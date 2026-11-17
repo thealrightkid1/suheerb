@@ -1,0 +1,53 @@
+@model List<BushiBan.Web.Features.Academics.FormRow>
+@{
+    ViewData["Title"] = "Form builder";
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Setup", null), ("Form builder", null) };
+}
+@section Head { <link rel="stylesheet" href="~/css/academics.css" asp-append-version="true" /> }
+@section Actions {
+    @if (User.HasPermission(Permissions.Kiosk.Registration))
+    {
+        <a class="btn btn-outline-secondary" asp-controller="Kiosk" asp-action="Register" target="_blank"><i class="bi bi-tablet-landscape me-1"></i>Open kiosk</a>
+    }
+    <a class="btn btn-primary" asp-action="Create"><i class="bi bi-plus-lg me-1"></i>New form</a>
+}
+<p class="text-body-secondary">These are the forms families fill in on the registration kiosk. Drag <i class="bi bi-grip-vertical"></i> to change the order they appear in. Changes to a form are saved as a draft until you publish them, and every submission keeps the version that was signed.</p>
+<div class="card">
+    <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">Forms</span>
+        <span class="small text-body-secondary" id="orderStatus" role="status"></span>
+    </div>
+    @Html.AntiForgeryToken()
+    @if (Model.Count == 0)
+    {
+        <div class="card-body text-center text-body-secondary py-5">No forms yet. Create one to get started.</div>
+    }
+    <ul class="fb-list" id="formList" data-save-url="@Url.Action("SaveOrder")">
+        @foreach (var f in Model)
+        {
+            <li data-id="@f.Id">
+                <span class="drag-handle" title="Drag to reorder"><i class="bi bi-grip-vertical"></i></span>
+                <div class="flex-grow-1 min-w-0">
+                    <a class="fw-semibold" asp-action="Edit" asp-route-id="@f.Id">@f.Name</a>
+                    <div class="small text-body-secondary">
+                        @f.Category.DisplayName()@(f.Program is null ? "" : " · " + f.Program)
+                        · @(f.Submissions == 1 ? "1 submission" : $"{f.Submissions:N0} submissions")
+                    </div>
+                </div>
+                <div class="d-none d-md-flex gap-2 align-items-center text-nowrap">
+                    @if (f.OnKiosk) { <span class="badge text-bg-success">On kiosk</span> }
+                    else if (!f.IsActive) { <span class="badge text-bg-secondary">Hidden</span> }
+                    else { <span class="badge text-bg-warning">Not published</span> }
+                    @if (f.PublishedVersion is int v) { <span class="badge text-bg-light border" title="Published @Format.Date(f.PublishedAt)">v@(v)</span> }
+                    @if (f.HasDraft) { <span class="badge text-bg-info" title="There are unpublished changes">Draft</span> }
+                </div>
+                <div class="text-nowrap">
+                    <a class="btn btn-sm btn-outline-secondary" asp-action="Preview" asp-route-id="@f.Id" target="_blank" title="Preview"><i class="bi bi-eye"></i></a>
+                    <a class="btn btn-sm btn-outline-secondary" asp-action="Edit" asp-route-id="@f.Id" title="Edit"><i class="bi bi-pencil"></i></a>
+                    <partial name="_DeleteButton" model='("FormBuilder", f.Id, "the form " + f.Name)' />
+                </div>
+            </li>
+        }
+    </ul>
+</div>
+@section Scripts { <script src="~/js/formbuilder.js" asp-append-version="true"></script> }

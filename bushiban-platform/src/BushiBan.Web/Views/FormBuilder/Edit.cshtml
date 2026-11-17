@@ -1,0 +1,195 @@
+@model BushiBan.Web.Features.Academics.FormEditPage
+@using BushiBan.Web.Services.Forms
+@inject BushiBan.Web.Services.BranchClock Clock
+@{
+    ViewData["Title"] = Model.Settings.Name;
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Form builder", Url.Action("Index")), (Model.Settings.Name, null) };
+    string? Err(string key) => ViewData.ModelState.TryGetValue(key, out var e) && e.Errors.Count > 0 ? e.Errors[0].ErrorMessage : null;
+    var typeLabels = new Dictionary<string, string>
+    {
+        ["heading"] = "Section heading", ["notice"] = "Notice / agreement text", ["text"] = "Short answer", ["textarea"] = "Long answer",
+        ["number"] = "Number", ["date"] = "Date", ["email"] = "Email", ["tel"] = "Phone", ["select"] = "Dropdown",
+        ["radio"] = "Pick one (buttons)", ["checkboxes"] = "Pick several (checkboxes)", ["checkbox"] = "Single tick box (I agree)",
+        ["signature"] = "Signature", ["city"] = "City",
+    };
+    var config = new
+    {
+        saveUrl = Url.Action("SaveDraft", new { id = Model.Id }),
+        previewUrl = Url.Action("Preview", new { id = Model.Id }),
+        types = FormSchema.FieldTypes.Select(t => new { value = t, label = typeLabels.GetValueOrDefault(t, t) }),
+        mapTargets = FormSchema.MapTargets.Select(kv => new { value = kv.Key, label = kv.Value }),
+    };
+    var json = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web);
+}
+@section Head { <link rel="stylesheet" href="~/css/academics.css" asp-append-version="true" /> }
+@section Actions {
+    <a class="btn btn-outline-secondary" href="@Url.Action("Preview", new { id = Model.Id })" target="_blank" id="previewBtn"><i class="bi bi-eye me-1"></i>Preview</a>
+    @if (Model.HasDraft)
+    {
+        <form method="post" asp-action="DiscardDraft" asp-route-id="@Model.Id" data-confirm="Throw away the unpublished changes? The published version stays as it is.">
+            <button class="btn btn-outline-secondary" id="discardBtn"><i class="bi bi-arrow-counterclockwise me-1"></i>Discard draft</button>
+        </form>
+    }
+    <form method="post" asp-action="Publish" asp-route-id="@Model.Id" id="publishForm" data-confirm="Publish this draft? It becomes the version families see on the kiosk and can't be edited afterwards (you can always publish a new version).">
+        <button class="btn btn-primary" id="publishBtn" disabled="@(!Model.HasDraft)" title="@(Model.HasDraft ? "" : "Save a draft first")"><i class="bi bi-rocket-takeoff me-1"></i>Publish</button>
+    </form>
+}
+
+<div class="row g-3 mb-3">
+    <div class="col-xl-8">
+        <form method="post" asp-action="Edit" asp-route-id="@Model.Id" class="card h-100" novalidate>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="Settings_Name">Form name <span class="text-danger">*</span></label>
+                        <input class="form-control @(Err("Settings.Name") is null ? "" : "is-invalid")" id="Settings_Name" name="Settings.Name" value="@Model.Settings.Name" maxlength="200" required />
+                        @if (Err("Settings.Name") is string e1) { <div class="invalid-feedback">@e1</div> }
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="Settings_Category">Category</label>
+                        <select class="form-select" id="Settings_Category" name="Settings.Category">
+                            @foreach (var c in Enum.GetValues<FormCategory>()) { <option value="@c" selected="@(Model.Settings.Category == c)">@c.DisplayName()</option> }
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="Settings_CourseId">Program</label>
+                        <select class="form-select" id="Settings_CourseId" name="Settings.CourseId">
+                            <option value="">None</option>
+                            @foreach (var c in Model.Courses) { <option value="@c.Value" selected="@c.Selected">@c.Text</option> }
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="Settings_IsActive" name="Settings.IsActive" value="true" checked="@Model.Settings.IsActive" />
+                            <input type="hidden" name="Settings.IsActive" value="false" />  @* after the checkbox: MVC binds the first value *@
+                            <label class="form-check-label" for="Settings_IsActive">Show on the registration kiosk</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6 text-md-end">
+                        <button class="btn btn-outline-primary btn-sm"><i class="bi bi-check-lg me-1"></i>Save settings</button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+    <div class="col-xl-4">
+        <div class="card h-100"><div class="card-body">
+            <div class="card-title-sm">Status</div>
+            <div class="mb-1">
+                @if (Model.PublishedVersion is int liveVersion) { <span class="badge text-bg-success">Version @liveVersion is live</span> }
+                else { <span class="badge text-bg-warning">Not published yet</span> }
+                @if (!Model.Settings.IsActive) { <span class="badge text-bg-secondary">Hidden from kiosk</span> }
+            </div>
+            <div class="small text-body-secondary fb-status" id="draftStatus">
+                @(Model.HasDraft ? "You're editing an unpublished draft." : "No draft. Saving your changes creates one; the live version doesn't change until you publish.")
+            </div>
+            <div class="small text-body-secondary mt-1">@Model.Submissions submission(s) so far.</div>
+        </div></div>
+    </div>
+</div>
+
+<div class="fb-editor" id="formBuilder" data-config="@System.Text.Json.JsonSerializer.Serialize(config, json)">
+    <script type="application/json" id="fbSchema">@Html.Raw(Model.SchemaJson)</script>
+    <div class="card">
+        <div class="card-header bg-transparent d-flex flex-wrap gap-2 align-items-center">
+            <span class="fw-semibold me-auto">Fields <span class="badge text-bg-light border" id="fieldCount"></span></span>
+            <div class="dropdown">
+                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" type="button"><i class="bi bi-plus-lg me-1"></i>Add field</button>
+                <ul class="dropdown-menu dropdown-menu-end fb-add-menu" id="addFieldMenu"></ul>
+            </div>
+            <button class="btn btn-sm btn-primary" type="button" id="saveDraftBtn"><i class="bi bi-cloud-arrow-up me-1"></i>Save draft</button>
+        </div>
+        <div class="alert alert-danger m-3 mb-0" id="fbProblems" hidden></div>
+        <div class="fb-fields" id="fieldList" role="list"></div>
+        <div class="card-footer bg-transparent small text-body-secondary d-flex justify-content-between">
+            <span>Click a field to edit it. Drag <i class="bi bi-grip-vertical"></i> to reorder.</span>
+            <span id="saveState" role="status"></span>
+        </div>
+    </div>
+
+    <div class="card fb-panel">
+        <div class="card-header bg-transparent fw-semibold">Field settings</div>
+        <div class="card-body" id="fieldPanel">
+            <p class="text-body-secondary mb-0" data-empty>Pick a field on the left to change it, or add a new one.</p>
+            <div data-editor hidden>
+                <div class="mb-3">
+                    <label class="form-label" for="fbType">Type</label>
+                    <select class="form-select" id="fbType" data-prop="type"></select>
+                </div>
+                <div class="mb-3" data-show="label">
+                    <label class="form-label" for="fbLabel">Label</label>
+                    <textarea class="form-control" id="fbLabel" data-prop="label" rows="2" maxlength="500"></textarea>
+                </div>
+                <div class="mb-3" data-show="key">
+                    <label class="form-label" for="fbKey">Key</label>
+                    <input class="form-control font-monospace" id="fbKey" data-prop="key" maxlength="80" spellcheck="false" />
+                    <div class="form-text">Saved with each answer. Made from the label until you change it; must be unique.</div>
+                </div>
+                <div class="mb-3" data-show="required">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="fbRequired" data-prop="required" />
+                        <label class="form-check-label" for="fbRequired">Required</label>
+                    </div>
+                </div>
+                <div class="mb-3" data-show="options">
+                    <label class="form-label" for="fbOptions">Options <span class="text-body-secondary small">(one per line)</span></label>
+                    <textarea class="form-control" id="fbOptions" data-prop="options" rows="5"></textarea>
+                </div>
+                <div class="mb-3" data-show="html">
+                    <label class="form-label" for="fbHtml">Text (HTML)</label>
+                    <textarea class="form-control font-monospace small" id="fbHtml" data-prop="html" rows="8"></textarea>
+                    <div class="form-text">Use &lt;p&gt;, &lt;strong&gt;, &lt;em&gt;, &lt;ul&gt;&lt;li&gt;, &lt;h5&gt;. Scripts and event handlers are removed when saved.</div>
+                    <div class="small fw-semibold mt-2 mb-1">Preview</div>
+                    <div class="fb-preview" id="fbHtmlPreview"></div>
+                </div>
+                <div class="mb-3" data-show="help">
+                    <label class="form-label" for="fbHelp">Help text</label>
+                    <input class="form-control" id="fbHelp" data-prop="help" maxlength="300" />
+                </div>
+                <div class="mb-3" data-show="placeholder">
+                    <label class="form-label" for="fbPlaceholder">Placeholder</label>
+                    <input class="form-control" id="fbPlaceholder" data-prop="placeholder" maxlength="120" />
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6" data-show="width">
+                        <label class="form-label" for="fbWidth">Width</label>
+                        <select class="form-select" id="fbWidth" data-prop="width">
+                            <option value="full">Full width</option>
+                            <option value="half">Half width</option>
+                        </select>
+                    </div>
+                    <div class="col-6" data-show="mapsTo">
+                        <label class="form-label" for="fbMapsTo">Fills in</label>
+                        <select class="form-select" id="fbMapsTo" data-prop="mapsTo"></select>
+                    </div>
+                </div>
+                <div class="form-text" data-show="mapsTo">"Fills in" copies the answer onto the new lead or student, so staff don't retype it.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-header bg-transparent fw-semibold">Versions</div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Version</th><th>Published</th><th class="text-end">Submissions</th><th></th></tr></thead>
+            <tbody>
+            @if (Model.Versions.Count == 0) { <tr><td colspan="4" class="empty">No versions yet.</td></tr> }
+            @foreach (var v in Model.Versions)
+            {
+                <tr>
+                    <td>
+                        @(v.IsDraft ? "Draft" : $"Version {v.VersionNumber}")
+                        @if (v.IsLive) { <span class="badge text-bg-success ms-1">Live</span> }
+                    </td>
+                    <td>@(v.PublishedAt is DateTime p ? Format.DateTime(Clock.ToLocal(p)) : v.UpdatedAt is DateTime u ? "Not published · last saved " + Format.DateTime(Clock.ToLocal(u)) : "Not published")</td>
+                    <td class="text-end">@v.Submissions</td>
+                    <td class="text-end"><a class="btn btn-sm btn-outline-secondary" asp-action="Preview" asp-route-id="@Model.Id" asp-route-version="@v.Id" target="_blank"><i class="bi bi-eye me-1"></i>Preview</a></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+@section Scripts { <script src="~/js/formbuilder.js" asp-append-version="true"></script> }

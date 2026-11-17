@@ -1,0 +1,57 @@
+@model List<BushiBan.Web.Features.Academics.RankingSystemRow>
+@{
+    ViewData["Title"] = "Ranking systems";
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Academics", null), ("Ranking systems", null) };
+    var canEdit = User.HasPermission(Permissions.RankingSystems.Edit);
+    var canDelete = User.HasPermission(Permissions.RankingSystems.Delete);
+}
+@section Actions {
+    @if (User.HasPermission(Permissions.RankingSystems.Create))
+    {
+        <a class="btn btn-primary" asp-action="Create"><i class="bi bi-plus-lg me-1"></i>Add ranking system</a>
+    }
+}
+<p class="text-body-secondary">A ranking system is the order of belts a student works through, with how long they stay at each belt and how many classes they need before testing.</p>
+<div class="card">
+    <div class="card-header bg-transparent">
+        <form method="get" class="row g-2">
+            <div class="col-sm-6 col-lg-4">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input class="form-control" name="q" value="@ViewData["Search"]" placeholder="Search ranking systems…" />
+                </div>
+            </div>
+        </form>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Name</th><th>Belts</th><th>Progression</th><th class="text-end">Programs</th><th>Active</th>@if (canEdit || canDelete) { <th class="text-end">Actions</th> }</tr></thead>
+            <tbody>
+            @if (Model.Count == 0) { <tr><td colspan="6" class="empty">No ranking systems yet.</td></tr> }
+            @foreach (var s in Model)
+            {
+                <tr>
+                    <td><a class="fw-medium" asp-action="Details" asp-route-id="@s.Id">@s.Name</a>@if (s.Description is not null) { <div class="small text-body-secondary">@s.Description</div> }</td>
+                    <td>@s.RankCount</td>
+                    <td class="text-nowrap">
+                        @if (s.FirstRank is not null)
+                        {
+                            <span class="belt" style="--belt:@(s.FirstColor ?? "#ccc")">@s.FirstRank</span>
+                            @if (s.RankCount > 1) { <i class="bi bi-arrow-right mx-1 text-body-secondary"></i><span class="belt" style="--belt:@(s.LastColor ?? "#ccc")">@s.LastRank</span> }
+                        }
+                    </td>
+                    <td class="text-end">@s.Programs</td>
+                    <td>@(s.IsActive ? "✓" : "")</td>
+                    @if (canEdit || canDelete)
+                    {
+                        <td class="text-end text-nowrap">
+                            @if (canEdit) { <a class="btn btn-sm btn-outline-secondary" asp-action="Edit" asp-route-id="@s.Id" title="Edit"><i class="bi bi-pencil"></i></a> }
+                            @if (canDelete) { <partial name="_DeleteButton" model='("RankingSystems", s.Id, "the ranking system " + s.Name)' /> }
+                        </td>
+                    }
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

@@ -1,0 +1,34 @@
+@model BushiBan.Web.Features.Attendance.KioskFormView
+@{
+    Layout = "_KioskLayout";
+    ViewData["Title"] = Model.Name;
+    ViewData["KioskHome"] = Url.Action("Register");
+}
+<div class="kf-page">
+    <div class="kf-top">
+        <a class="btn btn-lg btn-light kf-back" asp-action="Register" data-leave-form><i class="bi bi-arrow-left me-1"></i>All forms</a>
+    </div>
+    <form method="post" asp-action="Form" asp-route-id="@Model.FormId" class="kiosk-card kf-card" novalidate autocomplete="off" data-kiosk-submit
+          data-idle-url="@Url.Action("Register")">
+        <h1 class="kf-title">@Model.Name</h1>
+        <div class="kf-summary" role="alert" tabindex="-1" data-error-summary hidden="@(Model.Errors.Count == 0)">
+            <i class="bi bi-exclamation-circle"></i>
+            <div>A few answers need your attention. They're marked in red below.</div>
+        </div>
+        <partial name="_FormFields" model="Model" />
+        <div class="kf-submit">
+            <button class="btn btn-primary btn-lg kf-submit-btn" type="submit"><i class="bi bi-send me-2"></i>Submit</button>
+            <p class="kf-privacy"><i class="bi bi-shield-lock me-1"></i>Your answers go straight to our front desk and are not saved on this tablet.</p>
+        </div>
+    </form>
+</div>
+
+<div class="kiosk-idle" id="kioskIdle" hidden>
+    <div class="kiosk-card">
+        <h2>Are you still there?</h2>
+        <p>For your privacy this form will be cleared in <strong data-idle-count>30</strong> seconds.</p>
+        <button type="button" class="btn btn-primary btn-lg" data-idle-stay>I'm still here</button>
+    </div>
+</div>
+
+@section Scripts { <script src="~/lib/signature_pad/signature_pad.umd.min.js"></script> }

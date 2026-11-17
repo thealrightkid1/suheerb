@@ -1,0 +1,106 @@
+@model BushiBan.Web.Features.Academics.PromotionsPage
+@using BushiBan.Web.Features.Academics
+@{
+    ViewData["Title"] = "Belt promotions";
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Academics", null), ("Belt promotions", null) };
+}
+@section Head { <link rel="stylesheet" href="~/css/academics.css" asp-append-version="true" /> }
+@section Actions {
+    <a class="btn btn-outline-secondary" asp-action="History" asp-route-courseId="@Model.CourseId"><i class="bi bi-clock-history me-1"></i>Promotion history</a>
+}
+
+<div class="card mb-3">
+    <div class="card-body d-flex flex-wrap gap-3 align-items-end">
+        <form method="get" data-autosubmit class="me-auto" style="min-width:260px">
+            <label class="form-label small mb-1" for="courseId">Program</label>
+            <select class="form-select" id="courseId" name="courseId">
+                <option value="">All programs</option>
+                @foreach (var c in Model.Courses) { <option value="@c.Value" selected="@c.Selected">@c.Text</option> }
+            </select>
+        </form>
+        <div class="promo-stats">
+            <div><span class="n text-success">@Model.Ready.Count</span> ready to test</div>
+            <div><span class="n text-warning">@Model.AlmostReady.Count</span> almost ready</div>
+            <div><span class="n">@Model.NotYet</span> still working on it</div>
+        </div>
+    </div>
+    <div class="card-footer bg-transparent small text-body-secondary">
+        Students are ready when they've spent the required days at their current belt <em>and</em> attended the minimum number of classes since.
+        Requirements come from each program's first ranking system.
+        @if (Model.NotOnPath > 0) { <span>@Model.NotOnPath active student(s) have a belt that isn't on their program's ranking system, so they aren't listed.</span> }
+        @if (Model.AtTopRank > 0) { <span>@Model.AtTopRank are already at the top rank.</span> }
+    </div>
+</div>
+
+<form method="post" asp-action="Promote" id="promoteForm">
+    <input type="hidden" name="courseId" value="@Model.CourseId" />
+    @foreach (var (title, hint, list, kind) in new[] {
+        ("Ready to test", "They've met both requirements for their next belt.", Model.Ready, "ready"),
+        ("Almost ready", "80% or more of the way there.", Model.AlmostReady, "almost") })
+    {
+        <div class="card mb-3">
+            <div class="card-header bg-transparent">
+                <div class="fw-semibold">@title <span class="badge rounded-pill @(kind == "ready" ? "text-bg-success" : "text-bg-warning")">@list.Count</span></div>
+                <div class="small text-body-secondary">@hint</div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead><tr>
+                        @if (Model.CanPromote) { <th style="width:2.5rem"><input class="form-check-input" type="checkbox" data-check-all="@kind" aria-label="Select all" /></th> }
+                        <th>Student</th><th>Program</th><th>Belt</th><th>Time at belt</th><th>Classes since</th><th style="min-width:160px">Progress</th>
+                        @if (Model.CanPromote) { <th></th> }
+                    </tr></thead>
+                    <tbody>
+                    @if (list.Count == 0) { <tr><td colspan="8" class="empty">No students here right now.</td></tr> }
+                    @foreach (var c in list)
+                    {
+                        var pct = (int)Math.Round(c.Progress * 100);
+                        <tr>
+                            @if (Model.CanPromote) { <td><input class="form-check-input" type="checkbox" name="studentIds" value="@c.StudentId" data-group="@kind" aria-label="Select @c.Name" /></td> }
+                            <td><a class="fw-medium" asp-controller="Students" asp-action="Details" asp-route-id="@c.StudentId">@c.Name</a> <div class="small text-body-secondary">@c.StudentNo</div></td>
+                            <td>@c.Program</td>
+                            <td class="text-nowrap">
+                                <span class="belt" style="--belt:@(c.CurrentColor ?? "#ccc")">@c.CurrentRank</span>
+                                <i class="bi bi-arrow-right mx-1 text-body-secondary"></i>
+                                <span class="belt" style="--belt:@(c.NextColor ?? "#ccc")">@c.NextRank</span>
+                            </td>
+                            <td class="text-nowrap">@c.DaysAtRank of @c.RequiredDays days <div class="small text-body-secondary">since @Format.Date(c.Since)</div></td>
+                            <td class="text-nowrap">@c.ClassesSince@(c.RequiredClasses > 0 ? $" of {c.RequiredClasses}" : "") <div class="small text-body-secondary">@(c.RequiredClasses > 0 ? (c.ClassesToGo > 0 ? $"{c.ClassesToGo} to go" : "met") : "no minimum")</div></td>
+                            <td>
+                                <div class="progress promo-progress" role="progressbar" aria-valuenow="@pct" aria-valuemin="0" aria-valuemax="100" aria-label="Progress to @c.NextRank">
+                                    <div class="progress-bar @(c.IsReady ? "bg-success" : "bg-warning")" style="width:@pct%"></div>
+                                </div>
+                                <div class="small text-body-secondary mt-1">@pct%@(c.DaysToGo > 0 ? $" · {c.DaysToGo} days to go" : "")</div>
+                            </td>
+                            @if (Model.CanPromote)
+                            {
+                                <td class="text-end"><button class="btn btn-sm btn-outline-success text-nowrap" name="only" value="@c.StudentId" data-confirm-promote="Promote @c.Name to @c.NextRank?"><i class="bi bi-award me-1"></i>Promote</button></td>
+                            }
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    @if (Model.CanPromote && (Model.Ready.Count + Model.AlmostReady.Count) > 0)
+    {
+        <div class="card promo-bar">
+            <div class="card-body row g-2 align-items-end">
+                <div class="col-sm-4 col-lg-2">
+                    <label class="form-label small mb-1" for="promotedOn">Promotion date</label>
+                    <input class="form-control" type="date" id="promotedOn" name="promotedOn" value="@Model.Today.ToString("yyyy-MM-dd")" />
+                </div>
+                <div class="col-sm-8 col-lg-6">
+                    <label class="form-label small mb-1" for="notes">Notes (optional)</label>
+                    <input class="form-control" id="notes" name="notes" maxlength="500" placeholder="e.g. Belt test, November 2026" />
+                </div>
+                <div class="col-lg-4 text-lg-end">
+                    <button class="btn btn-success" id="promoteSelected" disabled><i class="bi bi-award me-1"></i>Promote selected (<span id="selCount">0</span>)</button>
+                </div>
+            </div>
+        </div>
+    }
+</form>
+@section Scripts { <script src="~/js/academics.js" asp-append-version="true"></script> }

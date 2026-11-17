@@ -1,0 +1,55 @@
+@model List<BushiBan.Web.Features.Academics.CourseRow>
+@{
+    ViewData["Title"] = "Programs";
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Academics", null), ("Programs", null) };
+    var canEdit = User.HasPermission(Permissions.Courses.Edit);
+    var canDelete = User.HasPermission(Permissions.Courses.Delete);
+}
+@section Actions {
+    @if (User.HasPermission(Permissions.Courses.Create))
+    {
+        <a class="btn btn-primary" asp-action="Create"><i class="bi bi-plus-lg me-1"></i>Add program</a>
+    }
+}
+<div class="card">
+    <div class="card-header bg-transparent">
+        <form method="get" class="row g-2">
+            <div class="col-sm-6 col-lg-4">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input class="form-control" name="q" value="@ViewData["Search"]" placeholder="Search programs…" />
+                </div>
+            </div>
+        </form>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr>
+                <th>Program</th><th>Fee structure</th><th>Ranking systems</th><th class="text-end">Weekly classes</th><th class="text-end">Active students</th><th>Active</th>
+                @if (canEdit || canDelete) { <th class="text-end">Actions</th> }
+            </tr></thead>
+            <tbody>
+            @if (Model.Count == 0) { <tr><td colspan="7" class="empty">No programs found.</td></tr> }
+            @foreach (var c in Model)
+            {
+                <tr class="@(c.IsActive ? "" : "text-body-secondary")">
+                    <td><a class="fw-medium" asp-action="Details" asp-route-id="@c.Id">@c.Name</a></td>
+                    <td>@if (c.FeeStructure is not null) { @c.FeeStructure <div class="small text-body-secondary">@Format.Money(c.MonthlyFee) a month</div> } else { <span>—</span> }</td>
+                    <td>@(c.RankingSystems.Count == 0 ? "—" : string.Join(", ", c.RankingSystems))</td>
+                    <td class="text-end">@c.WeeklyClasses</td>
+                    <td class="text-end">@c.ActiveStudents</td>
+                    <td>@(c.IsActive ? "✓" : "")</td>
+                    @if (canEdit || canDelete)
+                    {
+                        <td class="text-end text-nowrap">
+                            @if (canEdit) { <a class="btn btn-sm btn-outline-secondary" asp-action="Edit" asp-route-id="@c.Id" title="Edit"><i class="bi bi-pencil"></i></a> }
+                            @if (canDelete) { <partial name="_DeleteButton" model='("Courses", c.Id, "the program " + c.Name)' /> }
+                        </td>
+                    }
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+<div class="small text-body-secondary mt-3">@Model.Count program(s)</div>

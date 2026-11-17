@@ -1,0 +1,144 @@
+@model BushiBan.Web.Features.Attendance.RollPage
+@{
+    ViewData["Title"] = "Take attendance";
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Attendance", Url.Action("Index")), ("Take attendance", null) };
+    var presentCount = Model.Roster.Count(r => r.Present);
+}
+@section Head { <link rel="stylesheet" href="~/css/academics.css" asp-append-version="true" /> }
+@section Actions {
+    @if (User.HasPermission(Permissions.Attendance.View))
+    {
+        <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-clipboard-data me-1"></i>Records</a>
+    }
+}
+
+<div class="card mb-3">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end" data-autosubmit>
+            <div class="col-md-6 col-lg-5">
+                <label class="form-label" for="courseId">Program</label>
+                <select class="form-select" id="courseId" name="courseId" data-search>
+                    <option value="">Pick a program…</option>
+                    @foreach (var c in Model.Courses) { <option value="@c.Value" selected="@c.Selected">@c.Text</option> }
+                </select>
+            </div>
+            <div class="col-sm-6 col-md-3 col-lg-2">
+                <label class="form-label" for="date">Date</label>
+                <input class="form-control" type="date" id="date" name="date" value="@Model.Date.ToString("yyyy-MM-dd")" onchange="this.form.requestSubmit()" />
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-outline-secondary">Show roster</button>
+            </div>
+        </form>
+
+        <div class="mt-3">
+            <div class="card-title-sm mb-2">@(Model.IsToday ? "Today's classes" : $"Classes on {Model.Date.DayOfWeek}s")</div>
+            @if (Model.Classes.Count == 0)
+            {
+                <p class="text-body-secondary small mb-0">No classes are scheduled on @Model.Date.DayOfWeek. You can still take attendance for any program.</p>
+            }
+            else
+            {
+                <div class="class-chips">
+                    @foreach (var c in Model.Classes)
+                    {
+                        <a class="class-chip @(c.CourseId == Model.CourseId ? "active" : "")" asp-action="Roll" asp-route-courseId="@c.CourseId" asp-route-date="@Model.Date.ToString("yyyy-MM-dd")">
+                            <span class="time">@c.Times</span>
+                            <span class="name">@c.Program</span>
+                            @if (!string.IsNullOrEmpty(c.Instructor)) { <span class="who"><i class="bi bi-person"></i> @c.Instructor</span> }
+                        </a>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@if (Model.CourseId is null)
+{
+    <div class="card"><div class="card-body text-center text-body-secondary py-5">
+        <i class="bi bi-check2-square display-6 d-block mb-2"></i>
+        Pick a program, or tap one of the classes above, to see its roster.
+    </div></div>
+}
+else
+{
+    <form method="post" asp-action="Roll" id="rollForm">
+        <input type="hidden" name="courseId" value="@Model.CourseId" />
+        <input type="hidden" name="date" value="@Model.Date.ToString("yyyy-MM-dd")" />
+        <div class="card">
+            <div class="card-header bg-transparent d-flex flex-wrap gap-2 align-items-center">
+                <div class="me-auto">
+                    <div class="fw-semibold">@Model.CourseName · @Format.Date(Model.Date)</div>
+                    <div class="small text-body-secondary"><span id="presentCount">@presentCount</span> of <span id="rosterCount">@Model.Roster.Count</span> here. Tap a name to check them in or out.</div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-roll-all="true"><i class="bi bi-check-all me-1"></i>Everyone here</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-roll-all="false"><i class="bi bi-x-lg me-1"></i>Clear</button>
+            </div>
+            <div class="card-body">
+                @if (Model.Roster.Count == 0)
+                {
+                    <p class="text-body-secondary text-center py-3 mb-0" id="rollEmpty">No active students are enrolled in this program yet. Add students below.</p>
+                }
+                <div class="roll-grid" id="rollGrid">
+                    @foreach (var s in Model.Roster)
+                    {
+                        <label class="roll-tile @(s.Locked ? "locked" : "")" title="@(s.Locked ? "Checked in by someone else. Ask a manager to remove it." : "")">
+                            @if (s.Locked)
+                            {
+                                <input type="hidden" name="present" value="@s.Id" />
+                                <input type="checkbox" class="roll-check" checked disabled />
+                            }
+                            else
+                            {
+                                <input type="checkbox" class="roll-check" name="present" value="@s.Id" checked="@s.Present" />
+                            }
+                            <span class="roll-mark"><i class="bi bi-check-lg"></i></span>
+                            <span class="roll-body">
+                                <span class="roll-name">@s.Name</span>
+                                <span class="roll-meta">
+                                    @if (s.Belt is not null) { <span class="belt" style="--belt:@(s.BeltColor ?? "#ccc")">@s.Belt</span> }
+                                    @if (s.Visitor) { <span class="badge text-bg-light border">Other program</span> }
+                                    @if (s.CheckedInAt is not null) { <span class="text-body-secondary">@s.CheckedInAt</span> }
+                                    @if (s.Locked) { <i class="bi bi-lock-fill text-body-secondary"></i> }
+                                </span>
+                            </span>
+                        </label>
+                    }
+                </div>
+
+                <div class="row g-3 align-items-end mt-2">
+                    <div class="col-md-7 col-lg-6">
+                        <label class="form-label" for="addStudent">Add another student</label>
+                        <div class="d-flex gap-2">
+                            <select id="addStudent" class="form-select" data-search>
+                                <option value="">Search by name or student number…</option>
+                                @foreach (var o in Model.OtherStudents) { <option value="@o.Value">@o.Text</option> }
+                            </select>
+                            <button type="button" class="btn btn-outline-secondary text-nowrap" id="addStudentBtn"><i class="bi bi-plus-lg"></i> Add</button>
+                        </div>
+                        <div class="form-text">For make-up classes or students visiting from another program.</div>
+                    </div>
+                    <div class="col-sm-6 col-md-3 col-lg-2">
+                        <label class="form-label" for="checkInTime">Check-in time</label>
+                        <input class="form-control" type="time" id="checkInTime" name="checkInTime" value="@Model.CheckInTime" />
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer bg-transparent roll-footer">
+                <button class="btn btn-primary btn-lg"><i class="bi bi-check2-circle me-1"></i>Save attendance</button>
+                <span class="small text-body-secondary ms-2" id="rollDirty" hidden>Unsaved changes</span>
+            </div>
+        </div>
+    </form>
+
+    <template id="rollTileTemplate">
+        <label class="roll-tile">
+            <input type="checkbox" class="roll-check" name="present" checked />
+            <span class="roll-mark"><i class="bi bi-check-lg"></i></span>
+            <span class="roll-body"><span class="roll-name"></span><span class="roll-meta"><span class="badge text-bg-light border">Added</span></span></span>
+        </label>
+    </template>
+}
+
+@section Scripts { <script src="~/js/academics.js" asp-append-version="true"></script> }

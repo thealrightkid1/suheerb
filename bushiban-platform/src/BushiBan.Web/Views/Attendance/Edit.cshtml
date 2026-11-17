@@ -1,0 +1,54 @@
+@model BushiBan.Web.Features.Attendance.AttendanceEditModel
+@{
+    ViewData["Title"] = "Edit check-in";
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Attendance", Url.Action("Index")), ("Edit", null) };
+    var returnUrl = Context.Request.Query["returnUrl"].ToString();
+    string? Err(string key) => ViewData.ModelState.TryGetValue(key, out var e) && e.Errors.Count > 0 ? e.Errors[0].ErrorMessage : null;
+}
+<form method="post" asp-action="Edit" asp-route-id="@Model.Id" class="card form-card" style="max-width:720px" novalidate>
+    <input type="hidden" name="returnUrl" value="@returnUrl" />
+    <div class="card-body">
+        @if (Err("") is string top) { <div class="alert alert-danger">@top</div> }
+        <div class="row g-3">
+            <div class="col-12">
+                <label class="form-label">Student</label>
+                <div class="form-control-plaintext fw-semibold">@Model.StudentName</div>
+            </div>
+            <div class="col-sm-6">
+                <label class="form-label" for="Date">Date <span class="text-danger">*</span></label>
+                <input class="form-control @(Err("Date") is null ? "" : "is-invalid")" type="date" id="Date" name="Date" value="@Model.Date?.ToString("yyyy-MM-dd")" required />
+                @if (Err("Date") is string e1) { <div class="invalid-feedback">@e1</div> }
+            </div>
+            <div class="col-sm-6">
+                <label class="form-label" for="CheckInTime">Check-in time <span class="text-danger">*</span></label>
+                <input class="form-control @(Err("CheckInTime") is null ? "" : "is-invalid")" type="time" id="CheckInTime" name="CheckInTime" value="@Model.CheckInTime" required />
+                @if (Err("CheckInTime") is string e2) { <div class="invalid-feedback">@e2</div> }
+            </div>
+            <div class="col-sm-6">
+                <label class="form-label" for="CourseId">Program</label>
+                <select class="form-select @(Err("CourseId") is null ? "" : "is-invalid")" id="CourseId" name="CourseId" data-search>
+                    <option value="">No program</option>
+                    @foreach (var c in Model.Courses) { <option value="@c.Value" selected="@c.Selected">@c.Text</option> }
+                </select>
+                @if (Err("CourseId") is string e3) { <div class="invalid-feedback">@e3</div> }
+            </div>
+            <div class="col-sm-6">
+                <label class="form-label" for="Method">Method</label>
+                <select class="form-select" id="Method" name="Method">
+                    @foreach (var m in Enum.GetValues<CheckInMethod>()) { <option value="@m" selected="@(Model.Method == m)">@m.DisplayName()</option> }
+                </select>
+            </div>
+            <div class="col-12">
+                <label class="form-label" for="Notes">Notes</label>
+                <textarea class="form-control" id="Notes" name="Notes" rows="2" maxlength="500">@Model.Notes</textarea>
+            </div>
+            <div class="col-12 small text-body-secondary">
+                Recorded by @(Model.MarkedBy ?? "unknown")@(Model.Confidence is decimal conf ? $" · match confidence {conf:0.#}%" : "").
+            </div>
+        </div>
+    </div>
+    <div class="card-footer bg-transparent d-flex gap-2">
+        <button class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Save changes</button>
+        <a class="btn btn-outline-secondary" href="@(Url.IsLocalUrl(returnUrl) ? returnUrl : Url.Action("Index"))">Cancel</a>
+    </div>
+</form>

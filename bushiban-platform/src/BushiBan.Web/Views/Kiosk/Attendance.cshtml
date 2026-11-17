@@ -1,0 +1,54 @@
+@{
+    Layout = "_KioskLayout";
+    ViewData["Title"] = "Check in";
+    ViewData["KioskHome"] = Url.Action("Attendance");
+    ViewData["KioskBodyClass"] = "kiosk-checkin";
+}
+<div class="ck" id="checkin" data-checkin-url="@Url.Action("CheckIn")" data-search-url="@Url.Action("Search")">
+    <h1 class="ck-title">Welcome! Let's check you in.</h1>
+
+    <div class="ck-tabs" role="tablist">
+        <button type="button" class="ck-tab active" role="tab" aria-selected="true" data-tab="pin"><i class="bi bi-grid-3x3-gap"></i> My PIN</button>
+        <button type="button" class="ck-tab" role="tab" aria-selected="false" data-tab="search"><i class="bi bi-search"></i> Find my name</button>
+    </div>
+
+    <section class="ck-panel" data-panel="pin" aria-label="Check in with your PIN">
+        <div class="pin-display" aria-hidden="true">
+            @for (var i = 0; i < 6; i++) { <span class="pin-dot @(i >= 4 ? "optional" : "")"></span> }
+        </div>
+        <p class="ck-msg" id="pinMsg" role="status" aria-live="polite">Enter your 4 to 6 digit PIN</p>
+        <div class="pin-pad">
+            @foreach (var d in new[] { "1", "2", "3", "4", "5", "6", "7", "8", "9" })
+            {
+                <button type="button" class="pin-key" data-digit="@d">@d</button>
+            }
+            <button type="button" class="pin-key pin-key-alt" data-action="back" aria-label="Delete last digit"><i class="bi bi-backspace"></i></button>
+            <button type="button" class="pin-key" data-digit="0">0</button>
+            <button type="button" class="pin-key pin-key-go" data-action="go" aria-label="Check in"><i class="bi bi-check-lg"></i></button>
+        </div>
+    </section>
+
+    <section class="ck-panel" data-panel="search" aria-label="Find your name" hidden>
+        <div class="ck-search">
+            <i class="bi bi-search"></i>
+            <input type="search" id="nameSearch" placeholder="Type your first or last name" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" enterkeyhint="search" />
+        </div>
+        <p class="ck-msg" id="searchMsg" role="status" aria-live="polite">Type at least 2 letters of your name.</p>
+        <div class="ck-results" id="searchResults"></div>
+    </section>
+</div>
+
+<div class="ck-overlay" id="ckOverlay" hidden>
+    <div class="ck-card" role="dialog" aria-modal="true" aria-labelledby="ckHeadline">
+        <div class="ck-icon"><i class="bi"></i></div>
+        <h2 id="ckHeadline"></h2>
+        <div class="ck-belt"><span class="belt"></span></div>
+        <p class="ck-detail"></p>
+        <div class="ck-actions" hidden>
+            <button type="button" class="btn btn-lg btn-light ck-cancel">Not me</button>
+            <button type="button" class="btn btn-lg btn-success ck-yes"><i class="bi bi-check-lg me-1"></i>Yes, check me in</button>
+        </div>
+        <div class="ck-timer" hidden><span></span></div>
+        <p class="ck-tap">Tap anywhere to continue</p>
+    </div>
+</div>

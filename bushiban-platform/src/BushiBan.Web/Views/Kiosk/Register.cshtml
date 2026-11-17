@@ -1,0 +1,38 @@
+@model List<BushiBan.Web.Features.Attendance.KioskFormTile>
+@{
+    Layout = "_KioskLayout";
+    ViewData["Title"] = "Registration";
+    ViewData["KioskHome"] = Url.Action("Register");
+    (string Icon, string Hint) Describe(FormCategory c) => c switch
+    {
+        FormCategory.Admission => ("person-plus", "New to Bushi Ban? Start here."),
+        FormCategory.Agreement => ("file-earmark-check", "Enrollment agreement"),
+        FormCategory.ChangeForm => ("arrow-left-right", "Change or cancel your account"),
+        _ => ("file-earmark-text", "Form"),
+    };
+}
+<div class="kr-welcome">
+    <h1>Welcome to Bushi Ban!</h1>
+    <p>Tap the form you'd like to fill in. If you're not sure, our front desk is happy to help.</p>
+</div>
+@if (Model.Count == 0)
+{
+    <div class="kiosk-card kiosk-empty">
+        <i class="bi bi-clipboard"></i>
+        <p>There are no forms to fill in right now.<br />Please see the front desk.</p>
+    </div>
+}
+else
+{
+    <div class="kr-forms">
+        @foreach (var f in Model)
+        {
+            var (icon, hint) = Describe(f.Category);
+            <a class="kr-tile kr-@f.Category.ToString().ToLowerInvariant()" asp-action="Form" asp-route-id="@f.Id">
+                <span class="kr-icon"><i class="bi bi-@icon"></i></span>
+                <span class="kr-text"><span class="kr-name">@f.Name</span><span class="kr-hint">@hint</span></span>
+                <i class="bi bi-chevron-right kr-go"></i>
+            </a>
+        }
+    </div>
+}
