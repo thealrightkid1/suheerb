@@ -1,0 +1,82 @@
+{
+  "brandName": "Bushi Ban Hub",
+  "host": "127.0.0.1",
+  "hubPort": 3000,
+  "hubPublicUrl": "",
+  "sessionHours": 12,
+  "cookieDomain": "",
+  "secureCookies": false,
+  "trustProxy": false,
+
+  "users": [
+    {
+      "username": "admin",
+      "displayName": "Admin",
+      "password": "change-me",
+      "appCredentials": {}
+    }
+  ],
+
+  "apps": [
+    {
+      "id": "crm",
+      "name": "CRM",
+      "icon": "crm",
+      "description": "Leads, students, communications, programs, fees and accounting.",
+      "upstream": "https://dezify.bestautomation.top",
+      "port": 3001,
+      "publicUrl": "",
+      "startPath": "/",
+      "credentials": { "email": "", "password": "" },
+      "shortcuts": [
+        { "label": "Leads", "path": "/Leads" },
+        { "label": "Students", "path": "/Students" },
+        { "label": "Registrations", "path": "/Registrations" },
+        { "label": "Calendar", "path": "/Calendars" },
+        { "label": "Fee management", "path": "/Students/FeeManagement" }
+      ]
+    },
+    {
+      "id": "attendance",
+      "name": "Attendance",
+      "icon": "attendance",
+      "description": "Daily check-ins and attendance records.",
+      "upstream": "https://dezify.attendance.bestautomation.top",
+      "port": 3002,
+      "publicUrl": "",
+      "startPath": "/",
+      "credentials": { "email": "", "password": "" },
+      "shortcuts": []
+    },
+    {
+      "id": "registration",
+      "name": "Registration",
+      "icon": "registration",
+      "description": "Trial sessions and enrollment agreements for every program.",
+      "upstream": "https://dezify.registration.bestautomation.top",
+      "port": 3003,
+      "publicUrl": "",
+      "startPath": "/",
+      "credentials": { "email": "", "password": "" },
+      "shortcuts": [
+        { "label": "Trial / starter", "path": "/form/67" },
+        { "label": "Youth", "path": "/form/68" },
+        { "label": "Pre-K", "path": "/form/69" },
+        { "label": "Adult", "path": "/form/70" },
+        { "label": "Fighters Elite / MMA", "path": "/form/71" },
+        { "label": "Account change", "path": "/form/72" }
+      ]
+    },
+    {
+      "id": "payroll",
+      "name": "Payroll",
+      "icon": "payroll",
+      "description": "Not connected yet. Add its address and login to switch it on.",
+      "enabled": false,
+      "upstream": "",
+      "port": 3004,
+      "credentials": { "email": "", "password": "" },
+      "shortcuts": []
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hub</title>
+<link rel="stylesheet" href="/hub.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="logo" id="logo">H</div>
+      <div class="brand-name" id="brandName">Hub</div>
+    </div>
+    <nav>
+      <a class="nav-item" href="#/" data-app="home">
+        <span class="ico" data-icon="home"></span><span>Home</span>
+      </a>
+      <div class="nav-label">Apps</div>
+      <div id="appNav"></div>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="user"><span class="avatar" id="avatar">?</span><span id="userName"></span></div>
+      <a class="btn-ghost" href="/logout" title="Sign out of every app"><span class="ico" data-icon="logout"></span>Sign out</a>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn menu-btn" id="menuBtn" aria-label="Open menu"><span class="ico" data-icon="menu"></span></button>
+      <div class="crumbs"><b id="crumbApp">Home</b><span id="crumbPage"></span></div>
+      <div class="actions" id="frameActions" hidden>
+        <button class="icon-btn" id="backBtn" title="Back"><span class="ico" data-icon="back"></span></button>
+        <button class="icon-btn" id="reloadBtn" title="Reload"><span class="ico" data-icon="reload"></span></button>
+        <a class="icon-btn" id="newTabBtn" target="_blank" rel="noopener" title="Open in a new tab"><span class="ico" data-icon="external"></span></a>
+      </div>
+    </header>
+
+    <section class="view home" id="homeView">
+      <h1 id="greeting">Welcome</h1>
+      <p class="sub">Everything in one place. You're already signed in to each app below.</p>
+      <div class="cards" id="cards"></div>
+    </section>
+
+    <section class="view frames" id="frames" hidden></section>
+  </div>
+</div>
+<div class="scrim" id="scrim"></div>
+<script src="/hub.js"></script>
+</body>
+</html>
