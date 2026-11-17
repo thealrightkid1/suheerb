@@ -1,0 +1,181 @@
+@model BushiBan.Web.Features.Communications.ComposeModel
+@using BushiBan.Web.Features.Communications
+@using BushiBan.Web.Features.Communications.Messaging
+@{
+    ViewData["Title"] = "New message";
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Messages", Url.Action("Index")), ("New message", null) };
+    var input = Model.Input;
+    var a = input.Audience;
+    var isGroup = input.Mode != "one";
+    var isEmail = input.Channel == MessageChannel.Email;
+    var data = new
+    {
+        templates = Model.Templates.Select(t => new { id = t.Id, name = t.Name, channel = t.Channel.ToString(), subject = t.Subject, body = t.Body }),
+        person = Model.Person is null ? null : MessagesController.RecipientJson(Model.Person),
+        sample = TemplateRenderer.SampleValues,
+        limit = MessagingService.MaxBulkRecipients,
+        urls = new { preview = Url.Action("Preview"), recipients = Url.Action("Recipients"), merge = Url.Action("MergeValues") },
+    };
+}
+@section Head { <link rel="stylesheet" href="~/css/comms.css" asp-append-version="true" /> }
+
+<partial name="_ProviderNotice" model="(Model.EmailConfigured, Model.SmsConfigured)" />
+
+<form method="post" asp-action="Compose" id="composeForm" novalidate>
+    <input type="hidden" name="Mode" id="mode" value="@(isGroup ? "group" : "one")" />
+    <input type="hidden" name="ReturnUrl" value="@input.ReturnUrl" />
+    <div class="row g-3">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-body">
+                    @if (ViewContext.ViewData.ModelState.TryGetValue("", out var top) && top.Errors.Count > 0)
+                    {
+                        <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>@top.Errors[0].ErrorMessage</div>
+                    }
+
+                    <h2 class="form-section-title">1. Who is it for?</h2>
+                    <ul class="nav nav-pills mb-3" role="tablist">
+                        <li class="nav-item"><button type="button" class="nav-link @(isGroup ? "" : "active")" data-mode="one"><i class="bi bi-person me-1"></i>One person</button></li>
+                        <li class="nav-item"><button type="button" class="nav-link @(isGroup ? "active" : "")" data-mode="group"><i class="bi bi-people me-1"></i>A group</button></li>
+                    </ul>
+
+                    <div id="onePane" class="@(isGroup ? "d-none" : "")">
+                        <label class="form-label" for="recipient">Student or lead</label>
+                        <select id="recipient" name="Recipient" class="@(ViewContext.ViewData.ModelState.ContainsKey("Recipient") ? "is-invalid" : "")" placeholder="Type a name, email or phone…">
+                            @if (Model.Person is not null)
+                            {
+                                <option value="@MessagesController.RecipientKey(Model.Person)" selected>@Model.Person.FullName</option>
+                            }
+                        </select>
+                        @if (ViewContext.ViewData.ModelState.TryGetValue("Recipient", out var re) && re.Errors.Count > 0) { <div class="invalid-feedback d-block">@re.Errors[0].ErrorMessage</div> }
+                        <div id="personInfo" class="person-info small mt-2"></div>
+                    </div>
+
+                    <div id="groupPane" class="@(isGroup ? "" : "d-none")">
+                        <div class="btn-group mb-3" role="group" aria-label="Audience">
+                            <input type="radio" class="btn-check" name="Audience.Kind" id="kindStudents" value="Students" checked="@(a.Kind == AudienceKind.Students)" />
+                            <label class="btn btn-outline-secondary" for="kindStudents"><i class="bi bi-people me-1"></i>Students</label>
+                            <input type="radio" class="btn-check" name="Audience.Kind" id="kindLeads" value="Leads" checked="@(a.Kind == AudienceKind.Leads)" />
+                            <label class="btn btn-outline-secondary" for="kindLeads"><i class="bi bi-person-plus me-1"></i>Leads</label>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <label class="form-label small mb-1" for="aCourse">Program</label>
+                                <select class="form-select audience" id="aCourse" name="Audience.CourseId">
+                                    <option value="">Any program</option>
+                                    @foreach (var o in Model.Courses) { <option value="@o.Value" selected="@o.Selected">@o.Text</option> }
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small mb-1" for="aRank">Rank</label>
+                                <select class="form-select audience" id="aRank" name="Audience.RankId">
+                                    <option value="">Any rank</option>
+                                    @foreach (var o in Model.Ranks) { <option value="@o.Value" selected="@o.Selected">@o.Text</option> }
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small mb-1" for="aStatus">Status</label>
+                                <select class="form-select audience" id="aStatus" name="Audience.Status">
+                                    <option value="active" selected="@(a.Status is null or "active")">Active only</option>
+                                    <option value="inactive" selected="@(a.Status == "inactive")">Inactive only</option>
+                                    <option value="all" selected="@(a.Status == "all")">Active and inactive</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small mb-1" for="aAge">Age group</label>
+                                <select class="form-select audience" id="aAge" name="Audience.AgeGroup">
+                                    <option value="">Any age</option>
+                                    @foreach (var o in EnumHelpers.SelectList(a.AgeGroup)) { <option value="@o.Value" selected="@o.Selected">@o.Text</option> }
+                                </select>
+                            </div>
+                            <div class="col-md-6 lead-only">
+                                <label class="form-label small mb-1" for="aPhase">Prospect phase</label>
+                                <select class="form-select audience" id="aPhase" name="Audience.Phase">
+                                    <option value="">Any phase</option>
+                                    @foreach (var o in EnumHelpers.SelectList(a.Phase)) { <option value="@o.Value" selected="@o.Selected">@o.Text</option> }
+                                </select>
+                            </div>
+                            <div class="col-md-6 lead-only">
+                                <label class="form-label small mb-1" for="aSource">Source</label>
+                                <select class="form-select audience" id="aSource" name="Audience.Source">
+                                    <option value="">Any source</option>
+                                    @foreach (var o in EnumHelpers.SelectList(a.Source)) { <option value="@o.Value" selected="@o.Selected">@o.Text</option> }
+                                </select>
+                            </div>
+                        </div>
+                        <div id="audiencePreview" class="audience-preview mt-3" aria-live="polite">Counting recipients…</div>
+                    </div>
+
+                    <h2 class="form-section-title">2. How?</h2>
+                    <div class="btn-group" role="group" aria-label="Channel">
+                        <input type="radio" class="btn-check" name="Channel" id="chEmail" value="Email" checked="@isEmail" />
+                        <label class="btn btn-outline-secondary" for="chEmail"><i class="bi bi-envelope me-1"></i>Email</label>
+                        <input type="radio" class="btn-check" name="Channel" id="chSms" value="SMS" checked="@(!isEmail)" />
+                        <label class="btn btn-outline-secondary" for="chSms"><i class="bi bi-phone me-1"></i>Text message (SMS)</label>
+                    </div>
+
+                    <h2 class="form-section-title">3. Message</h2>
+                    <div class="mb-3">
+                        <label class="form-label" for="template">Start from a template <span class="text-body-secondary small">(optional)</span></label>
+                        <select class="form-select" id="template" name="TemplateId">
+                            <option value="">Blank message</option>
+                            @foreach (var t in Model.Templates)
+                            {
+                                <option value="@t.Id" data-channel="@t.Channel" selected="@(input.TemplateId == t.Id)">@t.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3 email-only">
+                        <label class="form-label" for="subject">Subject <span class="text-danger">*</span></label>
+                        <input class="form-control" id="subject" name="Subject" value="@input.Subject" maxlength="300" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label" for="body">Message <span class="text-danger">*</span></label>
+                        <textarea class="form-control font-monospace-sm" id="body" name="Body" rows="9">@input.Body</textarea>
+                        <div class="d-flex flex-wrap justify-content-between gap-2 mt-2">
+                            <div class="placeholder-chips">
+                                <span class="small text-body-secondary me-1">Insert:</span>
+                                @foreach (var p in TemplateRenderer.Placeholders)
+                                {
+                                    <button type="button" class="btn btn-sm btn-light border chip" data-insert="{{@p.Name}}" title="@p.Description">{{@p.Name}}</button>
+                                }
+                            </div>
+                            <div id="smsCounter" class="sms-counter small sms-only" aria-live="polite"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-transparent d-flex gap-2 align-items-center">
+                    <button class="btn btn-primary" id="sendBtn"><i class="bi bi-send me-1"></i><span>Send</span></button>
+                    <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+                    <span class="small text-body-secondary ms-auto" id="sendHint"></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card preview-card">
+                <div class="card-header bg-transparent fw-semibold"><i class="bi bi-eye me-1"></i>Preview</div>
+                <div class="card-body">
+                    <div class="small text-body-secondary mb-2" id="previewNote">With sample details.</div>
+                    <div class="email-only"><div class="small text-body-secondary">Subject</div><div class="fw-medium mb-2" id="previewSubject"></div></div>
+                    <div class="preview-body" id="previewBody"></div>
+                </div>
+            </div>
+            <div class="card mt-3">
+                <div class="card-body small">
+                    <div class="card-title-sm">Placeholders</div>
+                    <dl class="placeholder-help mb-0">
+                        @foreach (var p in TemplateRenderer.Placeholders)
+                        {
+                            <dt><code>{{@p.Name}}</code></dt><dd>@p.Description</dd>
+                        }
+                    </dl>
+                    <p class="text-body-secondary mb-0 mt-2">Students who have unsubscribed from email or texts are skipped automatically.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<script type="application/json" id="composeData">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(data, new System.Text.Json.JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.Default }))</script>
+@section Scripts { <script src="~/js/compose.js" asp-append-version="true"></script> }

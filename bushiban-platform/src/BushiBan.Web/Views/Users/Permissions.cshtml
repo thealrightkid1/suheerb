@@ -1,0 +1,91 @@
+@model BushiBan.Web.Features.Administration.PermissionsModel
+@{
+    ViewData["Title"] = "Permissions for " + Model.Name;
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Users", Url.Action("Index")), (Model.Name, Url.Action("Edit", new { id = Model.Id })), ("Permissions", null) };
+    var total = Permissions.All.Count();
+    var presets = Model.Presets.ToDictionary(p => p.Key, p => new { label = p.Value.Label, permissions = p.Value.Permissions });
+}
+@section Head { <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" /> }
+
+<form method="post" id="permForm">
+    @if (ViewContext.ViewData.ModelState.TryGetValue("", out var top) && top.Errors.Count > 0)
+    {
+        <div class="alert alert-danger"><ul class="mb-0 ps-3">@foreach (var e in top.Errors) { <li>@e.ErrorMessage</li> }</ul></div>
+    }
+    <div class="card mb-3">
+        <div class="card-body d-flex flex-wrap gap-3 align-items-center">
+            <div class="me-auto">
+                <div class="fw-semibold">@Model.Name</div>
+                <div class="small text-body-secondary">@Model.Email · Preset: <span id="presetName">@Model.PresetLabel</span></div>
+            </div>
+            <div class="perm-total"><span id="totalCount">0</span> of @total selected</div>
+            <select class="form-select w-auto" id="applyPreset" aria-label="Apply a preset">
+                <option value="">Fill from a preset…</option>
+                @foreach (var p in Model.Presets) { <option value="@p.Key">@p.Value.Label</option> }
+            </select>
+            <div class="btn-group">
+                <button type="button" class="btn btn-outline-secondary" id="selectAll"><i class="bi bi-check2-all me-1"></i>Select all</button>
+                <button type="button" class="btn btn-outline-secondary" id="clearAll"><i class="bi bi-x-lg me-1"></i>Clear all</button>
+            </div>
+        </div>
+    </div>
+
+    @if (Model.ShowSystemAdmin)
+    {
+        var grantable = Model.Grantable.Contains(Permissions.SystemAdmin);
+        <div class="card mb-3 perm-admin">
+            <div class="card-body">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input perm" type="checkbox" role="switch" id="permAdmin" name="permissions" value="@Permissions.SystemAdmin"
+                           checked="@Model.Checked.Contains(Permissions.SystemAdmin)" disabled="@(!grantable)" data-admin />
+                    <label class="form-check-label fw-semibold" for="permAdmin"><i class="bi bi-shield-lock me-1"></i>System admin</label>
+                </div>
+                <div class="small text-body-secondary ms-5">Full access to every feature in every branch, including other system admins' accounts. Only give this to people who run the whole school.</div>
+            </div>
+        </div>
+    }
+
+    <div class="row g-3">
+        @foreach (var g in Permissions.Groups)
+        {
+            var groupId = "g" + Permissions.Groups.ToList().IndexOf(g);
+            <div class="col-lg-6">
+                <div class="card perm-group h-100" data-group>
+                    <div class="card-header bg-transparent d-flex align-items-center gap-2">
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" role="switch" id="@groupId" data-group-toggle aria-label="All of @g.Name" />
+                            <label class="form-check-label fw-semibold" for="@groupId">@g.Name</label>
+                        </div>
+                        <span class="badge rounded-pill text-bg-light border ms-auto" data-group-count>0 / @g.Features.Count</span>
+                    </div>
+                    <div class="card-body py-2">
+                        @foreach (var f in g.Features)
+                        {
+                            var id = "p_" + f.Value.Replace(".", "_");
+                            var canGrant = Model.Grantable.Contains(f.Value);
+                            var selfLock = Model.IsSelf && f.Value == Permissions.Users.Manage;
+                            <div class="form-check perm-item">
+                                <input class="form-check-input perm" type="checkbox" id="@id" name="permissions" value="@f.Value"
+                                       checked="@Model.Checked.Contains(f.Value)" disabled="@(!canGrant)" />
+                                <label class="form-check-label" for="@id">
+                                    @f.Name
+                                    @if (!canGrant) { <i class="bi bi-lock text-body-secondary ms-1" title="You don't have this permission yourself, so you can't change it."></i> }
+                                    <span class="d-block small text-body-secondary">@f.Description</span>
+                                    @if (selfLock) { <span class="d-block small text-warning-emphasis">You can't remove this from yourself.</span> }
+                                </label>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="perm-savebar">
+        <button class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Save permissions</button>
+        <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+        <span class="small text-body-secondary ms-2">Changes apply within a minute. @(Model.IsSelf ? "" : "If they're signed in, they'll be asked to sign in again.")</span>
+    </div>
+</form>
+<script type="application/json" id="presetData">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(presets))</script>
+@section Scripts { <script src="~/js/permissions.js" asp-append-version="true"></script> }

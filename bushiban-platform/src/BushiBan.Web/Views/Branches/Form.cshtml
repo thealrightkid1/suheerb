@@ -1,0 +1,98 @@
+@model BushiBan.Web.Features.Administration.BranchesController.BranchInput
+@using BushiBan.Web.Features.Administration
+@{
+    var isNew = Model.Id == 0;
+    ViewData["Title"] = isNew ? "Add branch" : "Edit " + Model.Name;
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Branches", Url.Action("Index")), (isNew ? "Add" : "Edit", null) };
+    var schools = (List<SelectListItem>)ViewData["Schools"]!;
+    var cities = (List<SelectListItem>)ViewData["Cities"]!;
+    string? Err(string key) => ViewContext.ViewData.ModelState.TryGetValue(key, out var e) && e.Errors.Count > 0 ? e.Errors[0].ErrorMessage : null;
+    string Invalid(string key) => Err(key) is null ? "" : "is-invalid";
+}
+<form method="post" class="card form-card" novalidate>
+    <div class="card-body">
+        @if (isNew)
+        {
+            <div class="alert alert-info small"><i class="bi bi-magic me-1"></i>When you save, the branch gets the standard ranks, belt sizes, fee structure, programs, chart of accounts, fiscal year, kiosk forms and message templates automatically.</div>
+        }
+        <h2 class="form-section-title">Branch</h2>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label" for="Name">Branch name <span class="text-danger">*</span></label>
+                <input class="form-control @Invalid("Name")" id="Name" name="Name" value="@Model.Name" maxlength="150" placeholder="e.g. Pearland" />
+                <div class="invalid-feedback">@Err("Name")</div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="Code">Code <span class="text-danger">*</span></label>
+                <input class="form-control text-uppercase @Invalid("Code")" id="Code" name="Code" value="@Model.Code" maxlength="6" placeholder="PRL" autocomplete="off" />
+                <div class="invalid-feedback">@Err("Code")</div>
+                <div class="form-text">2–6 letters. Starts student numbers (e.g. PRL-00001).@if (!isNew) { <text> Changing it doesn't renumber existing students.</text> }</div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="SchoolId">School <span class="text-danger">*</span></label>
+                <select class="form-select @Invalid("SchoolId")" id="SchoolId" name="SchoolId">
+                    @foreach (var s in schools) { <option value="@s.Value" selected="@s.Selected">@s.Text</option> }
+                </select>
+                <div class="invalid-feedback">@Err("SchoolId")</div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="TimeZone">Time zone <span class="text-danger">*</span></label>
+                <select class="form-select @Invalid("TimeZone")" id="TimeZone" name="TimeZone">
+                    @foreach (var tz in BranchesController.TimeZones) { <option value="@tz.Id" selected="@(tz.Id == Model.TimeZone)">@tz.Label</option> }
+                </select>
+                <div class="invalid-feedback">@Err("TimeZone")</div>
+                <div class="form-text">Used for "today" in attendance, billing and the calendar.</div>
+            </div>
+            @if (!isNew)
+            {
+                <div class="col-md-6 d-flex align-items-center">
+                    <div class="form-check form-switch mt-md-4">
+                        <input class="form-check-input" type="checkbox" role="switch" id="IsActive" name="IsActive" value="true" checked="@Model.IsActive" />
+                        <input type="hidden" name="IsActive" value="false" />
+                        <label class="form-check-label" for="IsActive">Active (staff can switch to it)</label>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <h2 class="form-section-title">Address and contact</h2>
+        <div class="row g-3">
+            <div class="col-12">
+                <label class="form-label" for="Address">Street address</label>
+                <input class="form-control @Invalid("Address")" id="Address" name="Address" value="@Model.Address" maxlength="200" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="CityId">City</label>
+                <select class="form-select @Invalid("CityId")" id="CityId" name="CityId" data-search>
+                    <option value="">Select…</option>
+                    @foreach (var g in cities.GroupBy(c => c.Group?.Name))
+                    {
+                        <optgroup label="@g.Key">
+                            @foreach (var c in g) { <option value="@c.Value" selected="@c.Selected">@c.Text</option> }
+                        </optgroup>
+                    }
+                </select>
+                <div class="invalid-feedback">@Err("CityId")</div>
+                <div class="form-text">Missing a city? Add it under Setup › Cities.</div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="ZipCode">ZIP code</label>
+                <input class="form-control" id="ZipCode" name="ZipCode" value="@Model.ZipCode" maxlength="20" inputmode="numeric" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="Phone">Phone</label>
+                <input class="form-control @Invalid("Phone")" id="Phone" name="Phone" value="@Model.Phone" maxlength="30" type="tel" />
+                <div class="invalid-feedback">@Err("Phone")</div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="Email">Email</label>
+                <input class="form-control @Invalid("Email")" id="Email" name="Email" value="@Model.Email" maxlength="150" type="email" />
+                <div class="invalid-feedback">@Err("Email")</div>
+            </div>
+        </div>
+    </div>
+    <div class="card-footer bg-transparent d-flex gap-2">
+        <button class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>@(isNew ? "Create branch" : "Save changes")</button>
+        <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+    </div>
+</form>

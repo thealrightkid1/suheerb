@@ -1,0 +1,103 @@
+@model BushiBan.Web.Features.Administration.UserListModel
+@using BushiBan.Web.Features.Administration
+@{
+    ViewData["Title"] = "Users";
+    var anyFilter = !string.IsNullOrEmpty(Model.Q) || Model.BranchId is not null || !string.IsNullOrEmpty(Model.Status) || !string.IsNullOrEmpty(Model.Preset);
+}
+@section Head { <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" /> }
+@section Actions {
+    @if (Model.CanManage) { <a class="btn btn-primary" asp-action="Create"><i class="bi bi-person-plus me-1"></i>Add user</a> }
+}
+<div class="card">
+    <div class="card-header bg-transparent">
+        <form method="get" class="row g-2" data-autosubmit>
+            <div class="col-md-4">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input class="form-control" name="q" value="@Model.Q" placeholder="Search name or email…" />
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <select class="form-select" name="branchId" aria-label="Branch">
+                    <option value="">All branches</option>
+                    @foreach (var b in Model.Branches) { <option value="@b.Value" selected="@(b.Value == Model.BranchId?.ToString())">@b.Text</option> }
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <select class="form-select" name="preset" aria-label="Preset">
+                    <option value="">Any preset</option>
+                    @foreach (var p in Permissions.PresetLabels) { <option value="@p.Key" selected="@(p.Key == Model.Preset)">@p.Value</option> }
+                    <option value="Custom" selected="@(Model.Preset == "Custom")">Custom</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <select class="form-select" name="status" aria-label="Status">
+                    <option value="">Any status</option>
+                    <option value="active" selected="@(Model.Status == "active")">Active</option>
+                    <option value="inactive" selected="@(Model.Status == "inactive")">Deactivated</option>
+                    <option value="locked" selected="@(Model.Status == "locked")">Locked out</option>
+                </select>
+            </div>
+            @if (anyFilter) { <div class="col-auto"><a class="btn btn-link" asp-action="Index">Clear</a></div> }
+        </form>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr>
+                <th>Name</th><th>Preset</th><th>Home branch</th><th>Other branches</th><th>Last sign-in</th><th>Status</th>
+                @if (Model.CanManage) { <th class="text-end">Actions</th> }
+            </tr></thead>
+            <tbody>
+            @if (Model.Paged.Items.Count == 0) { <tr><td colspan="7" class="empty">No users found.</td></tr> }
+            @foreach (var u in Model.Paged.Items)
+            {
+                <tr class="@(u.IsActive ? "" : "text-body-secondary")">
+                    <td>
+                        @if (u.CanManage) { <a asp-action="Edit" asp-route-id="@u.Id" class="fw-medium">@u.Name</a> } else { <span class="fw-medium">@u.Name</span> }
+                        @if (u.IsSelf) { <span class="badge text-bg-light border ms-1">You</span> }
+                        <div class="small text-body-secondary">@u.Email</div>
+                    </td>
+                    <td>
+                        @if (u.IsSystemAdmin) { <span class="badge text-bg-dark"><i class="bi bi-shield-lock me-1"></i>System admin</span> }
+                        else
+                        {
+                            <div>@UserAdministration.PresetLabel(u.Preset)</div>
+                            <div class="small text-body-secondary">@u.PermissionCount @(u.PermissionCount == 1 ? "permission" : "permissions")</div>
+                        }
+                    </td>
+                    <td>@(u.HomeBranch ?? "—")</td>
+                    <td class="small">@(u.IsSystemAdmin ? "All branches" : u.OtherBranches.Count == 0 ? "—" : string.Join(", ", u.OtherBranches))</td>
+                    <td class="small text-nowrap">@(u.LastLoginAt is { } last ? Format.DateTime(Model.Clock.ToLocal(last)) : "Never")</td>
+                    <td>
+                        @if (!u.IsActive) { <span class="badge text-bg-secondary">Deactivated</span> }
+                        else if (u.IsLocked) { <span class="badge text-bg-warning"><i class="bi bi-lock me-1"></i>Locked out</span> }
+                        else { <span class="badge text-bg-success">Active</span> }
+                    </td>
+                    @if (Model.CanManage)
+                    {
+                        <td class="text-end text-nowrap">
+                            @if (u.CanManage)
+                            {
+                                @if (u.IsLocked)
+                                {
+                                    <form method="post" asp-action="Unlock" asp-route-id="@u.Id" class="d-inline">
+                                        <button class="btn btn-sm btn-outline-warning" title="Unlock"><i class="bi bi-unlock"></i></button>
+                                    </form>
+                                }
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="Permissions" asp-route-id="@u.Id" title="Permissions"><i class="bi bi-ui-checks-grid"></i></a>
+                                @if (!u.IsSelf) { <a class="btn btn-sm btn-outline-secondary" asp-action="ResetPassword" asp-route-id="@u.Id" title="Reset password"><i class="bi bi-key"></i></a> }
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="Edit" asp-route-id="@u.Id" title="Edit"><i class="bi bi-pencil"></i></a>
+                            }
+                            else
+                            {
+                                <span class="small text-body-secondary" title="Only a system admin can change a system admin's account."><i class="bi bi-lock"></i></span>
+                            }
+                        </td>
+                    }
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+<partial name="_Pager" model="(Model.Paged.Page, Model.Paged.Pages, Model.Paged.Total)" />

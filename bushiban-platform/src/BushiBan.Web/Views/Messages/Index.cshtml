@@ -1,0 +1,142 @@
+@model BushiBan.Web.Features.Communications.MessageHistoryModel
+@{
+    ViewData["Title"] = "Messages";
+    var f = Model.Filter;
+}
+@section Head { <link rel="stylesheet" href="~/css/comms.css" asp-append-version="true" /> }
+@section Actions {
+    @if (Model.CanSend)
+    {
+        <a class="btn btn-primary" asp-action="Compose"><i class="bi bi-send me-1"></i>New message</a>
+    }
+}
+
+<partial name="_ProviderNotice" model="(Model.EmailConfigured, Model.SmsConfigured)" />
+
+<div class="row g-3 mb-3">
+    <div class="col-sm-4">
+        <div class="card"><div class="card-body stat">
+            <div class="stat-icon tint-green"><i class="bi bi-send-check"></i></div>
+            <div><div class="stat-value">@Model.Count(MessageStatus.Sent).ToString("N0")</div><div class="stat-label">Sent in the last 30 days</div></div>
+        </div></div>
+    </div>
+    <div class="col-sm-4">
+        <div class="card"><div class="card-body stat">
+            <div class="stat-icon tint-amber"><i class="bi bi-plug"></i></div>
+            <div><div class="stat-value">@Model.Count(MessageStatus.NotConfigured).ToString("N0")</div><div class="stat-label">Not sent: provider not set up</div></div>
+        </div></div>
+    </div>
+    <div class="col-sm-4">
+        <div class="card"><div class="card-body stat">
+            <div class="stat-icon tint-red"><i class="bi bi-exclamation-octagon"></i></div>
+            <div><div class="stat-value">@Model.Count(MessageStatus.Failed).ToString("N0")</div><div class="stat-label">Failed in the last 30 days</div></div>
+        </div></div>
+    </div>
+</div>
+
+@if (f.Batch is not null)
+{
+    <div class="alert alert-info d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-collection me-2"></i>Showing the messages from one group send.</span>
+        <a asp-action="Index" class="btn btn-sm btn-outline-secondary">Show all messages</a>
+    </div>
+}
+
+<div class="card">
+    <div class="card-header bg-transparent">
+        <form method="get" class="row g-2 align-items-end" data-autosubmit>
+            @if (f.Batch is not null) { <input type="hidden" name="Batch" value="@f.Batch" /> }
+            <div class="col-md-3">
+                <label class="form-label small mb-1" for="q">Recipient</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input class="form-control" id="q" name="Q" value="@f.Q" placeholder="Name, email or phone" />
+                </div>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small mb-1" for="channel">Channel</label>
+                <select class="form-select" id="channel" name="Channel">
+                    <option value="">All</option>
+                    <option value="@((int)MessageChannel.Email)" selected="@(f.Channel == MessageChannel.Email)">Email</option>
+                    <option value="@((int)MessageChannel.SMS)" selected="@(f.Channel == MessageChannel.SMS)">Text (SMS)</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small mb-1" for="status">Status</label>
+                <select class="form-select" id="status" name="Status">
+                    <option value="">All</option>
+                    @foreach (var s in Enum.GetValues<MessageStatus>())
+                    {
+                        <option value="@((int)s)" selected="@(f.Status == s)">@s.DisplayName()</option>
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small mb-1" for="from">From</label>
+                <input class="form-control" type="date" id="from" name="From" value="@f.From?.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small mb-1" for="to">To</label>
+                <input class="form-control" type="date" id="to" name="To" value="@f.To?.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-md-1 d-flex gap-1">
+                <button class="btn btn-outline-secondary w-100" title="Apply filters"><i class="bi bi-funnel"></i></button>
+            </div>
+            @if (f.Any) { <div class="col-12"><a class="small" asp-action="Index">Clear filters</a></div> }
+        </form>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 msg-table">
+            <thead><tr>
+                <th>When</th><th>To</th><th>Channel</th><th>Message</th><th>Status</th><th>Sent by</th>
+            </tr></thead>
+            <tbody>
+            @if (Model.Paged.Items.Count == 0)
+            {
+                <tr><td colspan="6" class="empty">No messages yet@(f.Any ? " match these filters" : ""). @if (Model.CanSend && !f.Any) { <a asp-action="Compose">Send the first one.</a> }</td></tr>
+            }
+            @foreach (var m in Model.Paged.Items)
+            {
+                var detailId = "msg" + m.Id;
+                <tr class="msg-row" data-bs-toggle="collapse" data-bs-target="#@detailId" aria-expanded="false" aria-controls="@detailId" role="button">
+                    <td class="text-nowrap">@Format.DateTime(Model.Clock.ToLocal(m.CreatedAt))</td>
+                    <td>
+                        <div class="fw-medium">@(m.Recipient ?? "Unknown")
+                            @if (m.StudentId is not null) { <span class="badge text-bg-light border ms-1">Student</span> }
+                            else if (m.LeadId is not null) { <span class="badge text-bg-light border ms-1">Lead</span> }
+                        </div>
+                        <div class="small text-body-secondary">@m.To</div>
+                    </td>
+                    <td>@if (m.Channel == MessageChannel.Email) { <span><i class="bi bi-envelope me-1"></i>Email</span> } else { <span><i class="bi bi-phone me-1"></i>Text</span> }</td>
+                    <td class="msg-preview">
+                        @if (!string.IsNullOrEmpty(m.Subject)) { <div class="fw-medium text-truncate">@m.Subject</div> }
+                        <div class="small text-body-secondary text-truncate">@m.Body</div>
+                    </td>
+                    <td>
+                        <partial name="_StatusBadge" model="m.Status" />
+                        @if (m.BatchId is not null && f.Batch is null) { <a class="d-block small mt-1" asp-action="Index" asp-route-batch="@m.BatchId" onclick="event.stopPropagation()">Group send</a> }
+                    </td>
+                    <td class="small">@(m.CreatedBy is null ? "" : Model.SenderNames.TryGetValue(m.CreatedBy, out var n) ? n : m.CreatedBy)</td>
+                </tr>
+                <tr class="collapse msg-detail" id="@detailId">
+                    <td colspan="6">
+                        @if (m.Error is not null)
+                        {
+                            <div class="alert @(m.Status == MessageStatus.Failed ? "alert-danger" : "alert-warning") py-2 small mb-2"><i class="bi bi-info-circle me-1"></i>@m.Error</div>
+                        }
+                        @if (!string.IsNullOrEmpty(m.Subject)) { <div class="small text-body-secondary">Subject</div><div class="fw-medium mb-2">@m.Subject</div> }
+                        <div class="msg-body">@m.Body</div>
+                        @if (Model.CanSend && (m.StudentId is not null || m.LeadId is not null))
+                        {
+                            <a class="btn btn-sm btn-outline-secondary mt-2" asp-action="Compose" asp-route-studentId="@m.StudentId" asp-route-leadId="@m.LeadId" asp-route-channel="@m.Channel">
+                                <i class="bi bi-reply me-1"></i>Send another message
+                            </a>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+<partial name="_Pager" model="(Model.Paged.Page, Model.Paged.Pages, Model.Paged.Total)" />

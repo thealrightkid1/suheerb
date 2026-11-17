@@ -1,0 +1,13 @@
+@model (bool Email, bool Sms)
+@if (!Model.Email || !Model.Sms)
+{
+    var missing = !Model.Email && !Model.Sms ? "Email and text messaging aren't" : !Model.Email ? "Email isn't" : "Text messaging isn't";
+    <div class="alert alert-warning d-flex gap-2 align-items-start">
+        <i class="bi bi-plug fs-5"></i>
+        <div>
+            <strong>@missing set up yet.</strong>
+            You can still write and "send" messages: they're saved in the history as <em>Not sent: provider not set up</em> and on each person's timeline, but nobody receives them.
+            An administrator can turn sending on by filling in the @(!Model.Email ? "Email (SMTP)" : "")@(!Model.Email && !Model.Sms ? " and " : "")@(!Model.Sms ? "SMS (Twilio)" : "") settings on the server.
+        </div>
+    </div>
+}

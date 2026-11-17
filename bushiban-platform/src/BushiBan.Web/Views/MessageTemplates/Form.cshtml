@@ -1,0 +1,127 @@
+@model BushiBan.Web.Features.Communications.MessageTemplatesController.TemplateInput
+@using BushiBan.Web.Features.Communications.Messaging
+@{
+    var isNew = Model.Id == 0;
+    ViewData["Title"] = isNew ? "Add template" : "Edit template";
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Message templates", Url.Action("Index")), (isNew ? "Add" : "Edit", null) };
+    var isEmail = Model.Channel == MessageChannel.Email;
+}
+@section Head { <link rel="stylesheet" href="~/css/comms.css" asp-append-version="true" /> }
+@section Actions {
+    @if (!isNew) { <partial name="_DeleteButton" model='("MessageTemplates", Model.Id, "this template")' /> }
+}
+<div class="row g-3">
+    <div class="col-lg-8">
+        <form method="post" class="card" id="templateForm" novalidate>
+            <div class="card-body">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+                <div class="row g-3">
+                    <div class="col-md-7">
+                        <label class="form-label" asp-for="Name">Template name <span class="text-danger">*</span></label>
+                        <input class="form-control" asp-for="Name" placeholder="e.g. Trial class reminder" />
+                        <span class="invalid-feedback d-block" asp-validation-for="Name"></span>
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label d-block">Channel</label>
+                        <div class="btn-group" role="group">
+                            <input type="radio" class="btn-check" name="Channel" id="chEmail" value="Email" checked="@isEmail" />
+                            <label class="btn btn-outline-secondary" for="chEmail"><i class="bi bi-envelope me-1"></i>Email</label>
+                            <input type="radio" class="btn-check" name="Channel" id="chSms" value="SMS" checked="@(!isEmail)" />
+                            <label class="btn btn-outline-secondary" for="chSms"><i class="bi bi-phone me-1"></i>Text (SMS)</label>
+                        </div>
+                    </div>
+                    <div class="col-12 email-only">
+                        <label class="form-label" asp-for="Subject">Subject <span class="text-danger">*</span></label>
+                        <input class="form-control" asp-for="Subject" />
+                        <span class="invalid-feedback d-block" asp-validation-for="Subject"></span>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" asp-for="Body">Message <span class="text-danger">*</span></label>
+                        <textarea class="form-control font-monospace-sm" asp-for="Body" rows="10"></textarea>
+                        <span class="invalid-feedback d-block" asp-validation-for="Body"></span>
+                        <div class="d-flex flex-wrap justify-content-between gap-2 mt-2">
+                            <div class="placeholder-chips">
+                                <span class="small text-body-secondary me-1">Insert:</span>
+                                @foreach (var p in TemplateRenderer.Placeholders)
+                                {
+                                    <button type="button" class="btn btn-sm btn-light border chip" data-insert="{{@p.Name}}" title="@p.Description">{{@p.Name}}</button>
+                                }
+                            </div>
+                            <div id="smsCounter" class="small text-body-secondary sms-only"></div>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="IsActive" name="IsActive" value="true" checked="@Model.IsActive" />
+                            <input type="hidden" name="IsActive" value="false" />
+                            <label class="form-check-label" for="IsActive">Active (shown when writing messages)</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer bg-transparent d-flex gap-2">
+                <button class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>@(isNew ? "Create" : "Save changes")</button>
+                <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+            </div>
+        </form>
+    </div>
+    <div class="col-lg-4">
+        <div class="card preview-card">
+            <div class="card-header bg-transparent fw-semibold"><i class="bi bi-eye me-1"></i>Preview with sample details</div>
+            <div class="card-body">
+                <div class="email-only"><div class="small text-body-secondary">Subject</div><div class="fw-medium mb-2" id="previewSubject"></div></div>
+                <div class="preview-body" id="previewBody"></div>
+            </div>
+        </div>
+        <div class="card mt-3">
+            <div class="card-body small">
+                <div class="card-title-sm">Placeholders</div>
+                <dl class="placeholder-help mb-0">
+                    @foreach (var p in TemplateRenderer.Placeholders)
+                    {
+                        <dt><code>{{@p.Name}}</code></dt><dd>@p.Description</dd>
+                    }
+                </dl>
+                <p class="text-body-secondary mb-0 mt-2">Anything else in double braces is left blank, so check the spelling.</p>
+            </div>
+        </div>
+    </div>
+</div>
+<script type="application/json" id="sampleValues">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(TemplateRenderer.SampleValues))</script>
+@section Scripts {
+<script>
+(function () {
+  const form = document.getElementById('templateForm');
+  const sample = JSON.parse(document.getElementById('sampleValues').textContent);
+  const subject = form.querySelector('[name=Subject]'), body = form.querySelector('[name=Body]');
+  let last = body;
+  const render = t => String(t || '').replace(/\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g, (_, k) => {
+    const key = Object.keys(sample).find(x => x.toLowerCase() === k.toLowerCase());
+    return key ? sample[key] : '';
+  });
+  const channel = () => form.querySelector('input[name=Channel]:checked').value;
+  function update() {
+    const email = channel() === 'Email';
+    document.querySelectorAll('.email-only').forEach(e => e.classList.toggle('d-none', !email));
+    document.querySelectorAll('.sms-only').forEach(e => e.classList.toggle('d-none', email));
+    document.getElementById('previewSubject').textContent = render(subject.value);
+    const text = render(body.value);
+    document.getElementById('previewBody').textContent = text || '…';
+    if (!email) {
+      const special = /[^\x20-\x7E\n\r£¥èéùìòÇØøÅåÆæßÉÄÖÑÜ§¿äöñüà¡€]/.test(text);
+      const per = special ? 70 : 160, multi = special ? 67 : 153;
+      const segs = !text ? 0 : text.length <= per ? 1 : Math.ceil(text.length / multi);
+      document.getElementById('smsCounter').textContent = `About ${text.length} characters · ${segs} ${segs === 1 ? 'message' : 'messages'} with sample details`;
+    }
+  }
+  [subject, body].forEach(f => { f.addEventListener('input', update); f.addEventListener('focus', () => last = f); });
+  form.querySelectorAll('input[name=Channel]').forEach(r => r.addEventListener('change', update));
+  form.querySelectorAll('[data-insert]').forEach(c => c.addEventListener('click', () => {
+    const f = last.closest('.d-none') ? body : last;
+    f.setRangeText(c.dataset.insert, f.selectionStart ?? f.value.length, f.selectionEnd ?? f.value.length, 'end');
+    f.focus(); update();
+  }));
+  update();
+})();
+</script>
+}

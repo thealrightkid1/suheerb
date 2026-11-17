@@ -1,0 +1,37 @@
+@model BushiBan.Web.Features.Administration.ChangelogController.EntryInput
+@{
+    var isNew = Model.Id == 0;
+    ViewData["Title"] = isNew ? "Add release notes" : "Edit release notes";
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("What's new", Url.Action("Index")), (isNew ? "Add" : "Edit", null) };
+}
+<form method="post" class="card form-card" novalidate>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label" asp-for="Version">Version <span class="text-danger">*</span></label>
+                <input class="form-control" asp-for="Version" placeholder="1.2.0" />
+                <span class="invalid-feedback d-block" asp-validation-for="Version"></span>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" asp-for="ReleasedOn">Release date <span class="text-danger">*</span></label>
+                <input class="form-control" type="date" name="ReleasedOn" id="ReleasedOn" value="@Model.ReleasedOn?.ToString("yyyy-MM-dd")" />
+                <span class="invalid-feedback d-block" asp-validation-for="ReleasedOn"></span>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" asp-for="Title">Title <span class="text-danger">*</span></label>
+                <input class="form-control" asp-for="Title" placeholder="e.g. Faster attendance kiosk" />
+                <span class="invalid-feedback d-block" asp-validation-for="Title"></span>
+            </div>
+            <div class="col-12">
+                <label class="form-label" asp-for="Body">What changed <span class="text-danger">*</span></label>
+                <textarea class="form-control" asp-for="Body" rows="10" placeholder="- New: …&#10;- Fixed: …"></textarea>
+                <span class="invalid-feedback d-block" asp-validation-for="Body"></span>
+                <div class="form-text">Start a line with "- " to make it a bullet point. Leave a blank line between paragraphs.</div>
+            </div>
+        </div>
+    </div>
+    <div class="card-footer bg-transparent d-flex gap-2">
+        <button class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>@(isNew ? "Publish" : "Save changes")</button>
+        <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+    </div>
+</form>

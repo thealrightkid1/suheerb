@@ -1,0 +1,127 @@
+@model BushiBan.Web.Features.Administration.UserFormModel
+@{
+    var i = Model.Input;
+    ViewData["Title"] = Model.IsNew ? "Add user" : "Edit " + (i.DisplayName ?? i.Email);
+    ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Users", Url.Action("Index")), (Model.IsNew ? "Add" : "Edit", null) };
+    string? Err(string key) => ViewContext.ViewData.ModelState.TryGetValue(key, out var e) && e.Errors.Count > 0 ? e.Errors[0].ErrorMessage : null;
+    var presetKnown = i.Preset is not null && Permissions.PresetLabels.ContainsKey(i.Preset);
+}
+@section Head { <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" /> }
+@section Actions {
+    @if (!Model.IsNew)
+    {
+        <a class="btn btn-outline-secondary" asp-action="Permissions" asp-route-id="@i.Id"><i class="bi bi-ui-checks-grid me-1"></i>Permissions</a>
+        @if (!Model.IsSelf) { <a class="btn btn-outline-secondary" asp-action="ResetPassword" asp-route-id="@i.Id"><i class="bi bi-key me-1"></i>Reset password</a> }
+    }
+}
+<form method="post" class="card form-card" novalidate>
+    <div class="card-body">
+        @if (ViewContext.ViewData.ModelState.TryGetValue("", out var top) && top.Errors.Count > 0)
+        {
+            <div class="alert alert-danger"><ul class="mb-0 ps-3">@foreach (var e in top.Errors) { <li>@e.ErrorMessage</li> }</ul></div>
+        }
+        @if (Model.IsLocked)
+        {
+            <div class="alert alert-warning d-flex align-items-center gap-2">
+                <i class="bi bi-lock"></i><span class="me-auto">This account is locked after too many wrong passwords.</span>
+                <button class="btn btn-sm btn-warning" form="unlockForm">Unlock now</button>
+            </div>
+        }
+
+        <h2 class="form-section-title">Account</h2>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label" for="DisplayName">Name <span class="text-danger">*</span></label>
+                <input class="form-control @(Err("DisplayName") is null ? "" : "is-invalid")" id="DisplayName" name="DisplayName" value="@i.DisplayName" maxlength="120" autocomplete="off" />
+                <div class="invalid-feedback">@Err("DisplayName")</div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="Email">Email (used to sign in) <span class="text-danger">*</span></label>
+                <input class="form-control @(Err("Email") is null ? "" : "is-invalid")" id="Email" name="Email" type="email" value="@i.Email" maxlength="150" autocomplete="off" />
+                <div class="invalid-feedback">@Err("Email")</div>
+            </div>
+            @if (Model.IsNew)
+            {
+                <div class="col-md-6">
+                    <label class="form-label" for="Password">Password <span class="text-danger">*</span></label>
+                    <div class="input-group">
+                        <input class="form-control" id="Password" name="Password" type="password" autocomplete="new-password" minlength="8" />
+                        <button type="button" class="btn btn-outline-secondary" id="genPassword" title="Make up a strong password"><i class="bi bi-magic"></i></button>
+                    </div>
+                    <div class="form-text">At least 8 characters with upper and lower case letters and a number.</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="ConfirmPassword">Confirm password <span class="text-danger">*</span></label>
+                    <input class="form-control" id="ConfirmPassword" name="ConfirmPassword" type="password" autocomplete="new-password" />
+                </div>
+            }
+        </div>
+
+        <h2 class="form-section-title">Access</h2>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label" for="Preset">Permission preset</label>
+                <select class="form-select" id="Preset" name="Preset">
+                    @if (!Model.IsNew && !presetKnown) { <option value="" selected>@(Model.CurrentPresetLabel ?? "Custom") (keep current permissions)</option> }
+                    @foreach (var p in Model.Presets) { <option value="@p.Value" selected="@p.Selected">@p.Text</option> }
+                </select>
+                <div class="form-text">
+                    @if (Model.IsNew) { <text>You can fine-tune individual permissions after creating the account.</text> }
+                    else { <text>Currently @Model.PermissionCount permission(s). Choosing a different preset replaces them. <a asp-action="Permissions" asp-route-id="@i.Id">Fine-tune permissions</a></text> }
+                </div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="HomeBranchId">Home branch <span class="text-danger">*</span></label>
+                <select class="form-select" id="HomeBranchId" name="HomeBranchId" data-search>
+                    <option value="">Select…</option>
+                    @foreach (var b in Model.Branches) { <option value="@b.Value" selected="@(b.Value == i.HomeBranchId?.ToString())">@b.Text</option> }
+                </select>
+                <div class="form-text">Where they land after signing in.</div>
+            </div>
+            <div class="col-12">
+                <label class="form-label" for="ExtraBranchIds">Also works at</label>
+                <select class="form-select" id="ExtraBranchIds" name="ExtraBranchIds" multiple data-search>
+                    @foreach (var b in Model.Branches) { <option value="@b.Value" selected="@i.ExtraBranchIds.Contains(int.Parse(b.Value))">@b.Text</option> }
+                </select>
+                <div class="form-text">
+                    They can switch to these branches from the top bar. System admins can use every branch.
+                    @if (Model.OtherBranchesNotShown.Count > 0) { <span>They also have access to @string.Join(", ", Model.OtherBranchesNotShown), which you don't manage; that stays as it is.</span> }
+                </div>
+            </div>
+            @if (!Model.IsNew)
+            {
+                <div class="col-12">
+                    <div class="form-check form-switch">
+                        @* Checkbox before the hidden "false": MVC binds the first value. *@
+                        <input class="form-check-input" type="checkbox" role="switch" id="IsActive" name="IsActive" value="true" checked="@i.IsActive" disabled="@Model.IsSelf" />
+                        <input type="hidden" name="IsActive" value="@(Model.IsSelf ? "true" : "false")" />
+                        <label class="form-check-label" for="IsActive">Active</label>
+                    </div>
+                    <div class="form-text">@(Model.IsSelf ? "You can't deactivate your own account." : "Deactivated users can't sign in and are signed out within a minute. Their history is kept.")</div>
+                </div>
+            }
+            else
+            {
+                <input type="hidden" name="IsActive" value="true" />
+            }
+        </div>
+    </div>
+    <div class="card-footer bg-transparent d-flex gap-2">
+        <button class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>@(Model.IsNew ? "Create user" : "Save changes")</button>
+        <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+    </div>
+</form>
+@if (Model.IsLocked) { <form id="unlockForm" method="post" asp-action="Unlock" asp-route-id="@i.Id"></form> }
+@section Scripts {
+<script>
+document.getElementById('genPassword')?.addEventListener('click', () => {
+  const sets = ['ABCDEFGHJKLMNPQRSTUVWXYZ', 'abcdefghijkmnopqrstuvwxyz', '23456789', '!#%+='];
+  const rand = n => crypto.getRandomValues(new Uint32Array(1))[0] % n;
+  let pw = sets.map(s => s[rand(s.length)]).join('');
+  const all = sets.join('');
+  while (pw.length < 14) pw += all[rand(all.length)];
+  pw = pw.split('').sort(() => rand(3) - 1).join('');
+  for (const id of ['Password', 'ConfirmPassword']) { const f = document.getElementById(id); f.value = pw; f.type = 'text'; }
+});
+</script>
+}
